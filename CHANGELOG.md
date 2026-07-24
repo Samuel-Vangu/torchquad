@@ -14,6 +14,9 @@ packaging, and closing long-open fixed issues.
 - `VEGAS.integrate(..., return_error=True)` returns a `VEGASResult` bundling the
   integral with its error estimate (standard deviation, chi-squared, degrees of
   freedom and goodness-of-fit Q) instead of discarding them.
+- `args` argument on every integrator's `integrate()` — extra parameters are
+  forwarded to the integrand as `fn(points, *args)`, so parametric integrands no
+  longer need a lambda wrapper (#187, #188).
 - Optional-dependency extras: `dev`, `docs`, and CPU-convenience backend extras
   `torch`, `jax`, `tensorflow`, `all`.
 - `release_testing/` suite — slower end-to-end checks run against the latest

@@ -43,6 +43,7 @@ class VEGAS(BaseIntegrator):
         use_warmup=True,
         backend=None,
         return_error=False,
+        args=None,
     ):
         """Integrates the passed function on the passed domain using VEGAS.
 
@@ -63,6 +64,7 @@ class VEGAS(BaseIntegrator):
             use_warmup (bool, optional): If True, execute a warmup to initialize the vegas map. Defaults to True.
             backend (string, optional): Numerical backend. "jax" and "tensorflow" are unsupported. Defaults to integration_domain's backend if it is a tensor and otherwise to the backend from the latest call to set_up_backend or "torch" for backwards compatibility.
             return_error (bool, optional): If True, return a :class:`VEGASResult` bundling the integral with its error estimate (standard deviation, chi-squared, degrees of freedom and goodness-of-fit Q) instead of the bare integral value. Defaults to False.
+            args (list or tuple, optional): Extra arguments passed to the integrand as ``fn(points, *args)``. Defaults to None.
 
         Raises:
             ValueError: If the integration_domain or backend argument is invalid
@@ -109,9 +111,13 @@ class VEGAS(BaseIntegrator):
         domain_starts = integration_domain[:, 0]
         domain_sizes = integration_domain[:, 1] - domain_starts
         domain_volume = anp.prod(domain_sizes)
+        # VEGAS bakes the integrand into a closure and evaluates it via _eval
+        # rather than passing args through evaluate_integrand, so it repeats the
+        # None -> () normalization here. Keep the two in sync if either changes.
+        extra_args = () if args is None else args
 
         def transformed_integrand(x):
-            return fn(x * domain_sizes + domain_starts) * domain_volume
+            return fn(x * domain_sizes + domain_starts, *extra_args) * domain_volume
 
         self._fn = transformed_integrand
 
