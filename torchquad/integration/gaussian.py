@@ -24,7 +24,7 @@ class Gaussian(GridIntegrator):
         self._root_args = ()
         self._cache = {}
 
-    def integrate(self, fn, dim, N=8, integration_domain=None, backend=None):
+    def integrate(self, fn, dim, N=8, integration_domain=None, backend=None, args=None):
         """Integrates the passed function on the passed domain using a Gaussian rule (Gauss-Legendre on [-1,1] as a default).
 
         Args:
@@ -33,11 +33,12 @@ class Gaussian(GridIntegrator):
             N (int, optional): Total number of sample points to use for the integration. Should be odd. Defaults to 3 points per dimension if None is given.
             integration_domain (list or backend tensor, optional): Integration domain, e.g. [[-1,1],[0,1]]. Defaults to [-1,1]^dim.   It also determines the numerical backend if possible.
             backend (string, optional): Numerical backend. This argument is ignored if the backend can be inferred from integration_domain. Defaults to the backend from the latest call to set_up_backend or "torch" for backwards compatibility.
+            args (list or tuple, optional): Extra arguments passed to the integrand as ``fn(points, *args)``. Defaults to None.
 
         Returns:
             backend-specific number: Integral value
         """
-        return super().integrate(fn, dim, N, integration_domain, backend)
+        return super().integrate(fn, dim, N, integration_domain, backend, args=args)
 
     def _weights(self, N, dim, backend, requires_grad=False):
         """return the weights, broadcast across the dimensions, generated from the polynomial of choice

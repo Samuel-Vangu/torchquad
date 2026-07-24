@@ -30,7 +30,7 @@ class GridIntegrator(BaseIntegrator):
     def _weights(self, N, dim, backend, requires_grad=False):
         return None
 
-    def integrate(self, fn, dim, N, integration_domain, backend):
+    def integrate(self, fn, dim, N, integration_domain, backend, args=None):
         """Integrate the passed function on the passed domain using a Composite Newton Cotes rule.
         The argument meanings are explained in more detail in the sub-classes.
 
@@ -40,6 +40,7 @@ class GridIntegrator(BaseIntegrator):
             N (int): Total number of sample points to use for the integration.
             integration_domain (list or backend tensor): Integration domain, e.g. [[-1,1],[0,1]]. It can also determine the numerical backend.
             backend (string): Numerical backend. Ignored if it can be inferred from integration_domain.
+            args (list or tuple, optional): Extra arguments passed to the integrand as ``fn(points, *args)``. Defaults to None.
 
         Returns:
             float: integral value
@@ -56,7 +57,7 @@ class GridIntegrator(BaseIntegrator):
 
         logger.debug("Evaluating integrand on the grid.")
         function_values, num_points = self.evaluate_integrand(
-            fn, grid_points, weights=self._weights(n_per_dim, dim, backend)
+            fn, grid_points, weights=self._weights(n_per_dim, dim, backend), args=args
         )
         self._nr_of_fevals = num_points
 
