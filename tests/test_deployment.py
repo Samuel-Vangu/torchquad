@@ -55,12 +55,14 @@ def test_deprecated_alias_warns():
     The old ``_deployment_test`` name is kept working for one release but must
     emit a DeprecationWarning (regression guard for the 0.6 rename).
     """
-    from torchquad.utils.deployment_test import _deployment_test
+    import torchquad
 
+    # Exercise the path users actually rely on (torchquad._deployment_test),
+    # so a break in the top-level re-export is caught too.
     with warnings.catch_warnings():
         warnings.simplefilter("error", DeprecationWarning)
         with pytest.raises(DeprecationWarning):
-            _deployment_test()
+            torchquad._deployment_test()
 
 
 def test_deployment_helper_functions():

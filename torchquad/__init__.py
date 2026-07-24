@@ -34,8 +34,9 @@ from .utils.set_precision import set_precision
 from .utils.set_up_backend import set_up_backend
 from .utils.deployment_test import deployment_test
 
-# Deprecated alias kept importable for one release (0.6); the redundant `as`
-# marks it as an intentional re-export so it is not flagged as unused.
+# Deprecated alias kept importable for one release (0.6), but intentionally left
+# out of __all__ so it is not part of the public API. The redundant `as` marks it
+# as a deliberate re-export so it is not flagged as unused.
 from .utils.deployment_test import _deployment_test as _deployment_test
 
 __all__ = [
@@ -57,9 +58,6 @@ __all__ = [
     "set_up_backend",
     "deployment_test",
 ]
-
-# _deployment_test is a deprecated alias kept importable for one release (0.6);
-# it is intentionally excluded from __all__ so it is not part of the public API.
 
 if not TORCHQUAD_DISABLE_LOGGING:
     set_log_level(os.environ.get("TORCHQUAD_LOG_LEVEL", "WARNING"))
