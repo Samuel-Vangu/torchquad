@@ -26,13 +26,20 @@ from .integration.grid_integrator import GridIntegrator
 from .integration.base_integrator import BaseIntegrator
 
 from .integration.rng import RNG
+from .integration.qmc import Sobol
 
 
 from .utils.set_log_level import set_log_level
 from .utils.enable_cuda import enable_cuda
 from .utils.set_precision import set_precision
 from .utils.set_up_backend import set_up_backend
-from .utils.deployment_test import _deployment_test
+
+# _deployment_test is an internal post-release self-test. It is deliberately kept
+# out of __all__ (and keeps its leading underscore) so it does not appear in the
+# public API or user autocomplete, while staying reachable as torchquad._deployment_test
+# for the wheel-smoke CI job and the install self-check documented in the README.
+# The redundant `as` marks it as an intentional re-export so it is not flagged as unused.
+from .utils.deployment_test import _deployment_test as _deployment_test
 
 __all__ = [
     "__version__",
@@ -47,11 +54,11 @@ __all__ = [
     "GaussLegendre",
     "Gaussian",
     "RNG",
+    "Sobol",
     "enable_cuda",
     "set_precision",
     "set_log_level",
     "set_up_backend",
-    "_deployment_test",
 ]
 
 if not TORCHQUAD_DISABLE_LOGGING:

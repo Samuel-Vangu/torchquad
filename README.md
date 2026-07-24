@@ -72,7 +72,7 @@ The software is free to use and is designed for the machine learning community a
 This project is built with the following packages:
 
 * [autoray](https://github.com/jcmgray/autoray), which means the implemented quadrature supports [NumPy](https://numpy.org/) and can be used for machine learning with modules such as [PyTorch](https://pytorch.org/), [JAX](https://github.com/google/jax/) and [Tensorflow](https://www.tensorflow.org/), where it is fully differentiable
-* [conda](https://docs.conda.io/en/latest/), which will take care of all requirements for you
+* [uv](https://docs.astral.sh/uv/) or [conda](https://docs.conda.io/en/latest/), either of which can set up the required environment for you
 
 
 If torchquad proves useful to you, please consider citing the [accompanying paper](https://joss.theoj.org/papers/10.21105/joss.03439).

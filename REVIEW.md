@@ -20,10 +20,14 @@ This is the headline feature. A crash is recoverable; a wrong number in a cited
 paper is not. Scrutinise anything touching a numerical kernel
 (`integration/`, weights, grids, RNG, VEGAS map/stratification).
 
-- **Compare against analytic ground truth.** New or changed integrators must be
-  checked against the closed-form integrals in
-  `tests/integration_test_functions.py`, not just "runs without error". A bug fix
-  needs a regression test that would fail on the old code.
+- **Compare against analytic ground truth.** New or changed integrators, samplers,
+  and error estimates must be checked against the closed-form integrals in
+  `tests/integration_test_functions.py`, not just "runs without error" — and
+  against the **whole** collection via `helper_functions.py::compute_integration_test_errors`
+  (real + complex, 1-D/3-D/10-D), not one or two ad-hoc integrands. A *reported
+  error* (e.g. VEGAS's `sdev`/`chi2`) must itself be validated against the true
+  error from these functions, not merely bound-checked. A bug fix needs a
+  regression test that would fail on the old code.
 - **A loosened tolerance is a finding until justified.** If an assertion's
   tolerance was widened to make a test pass, the PR must explain *why* the extra
   error is real hardware/reduction-order non-associativity and not a genuine
@@ -126,9 +130,11 @@ CLAUDE.md rules 8, 10, 13.
   visible — grep `pyproject.toml`'s `filterwarnings` so it isn't suppressed. A
   suppressed self-deprecation warning that never resolves is exactly the anti-pattern
   being removed in 0.6.
-- Public names must not start with an underscore (`_deployment_test` in `__all__`
-  is the known offender). No abbreviations in new code: `integration_domain` not
-  `int_dom`, `function_values` not `fvals`.
+- A name in `__all__` must not start with an underscore — the two contradict each
+  other. `_deployment_test` was the archetype (underscore *and* in `__all__`); the
+  fix was to drop it from `__all__` and keep it private (it is an internal
+  self-test, not user-facing), not to make it public. No abbreviations in new
+  code: `integration_domain` not `int_dom`, `function_values` not `fvals`.
 
 ## 8. Simplicity, size budgets, dataclasses
 
