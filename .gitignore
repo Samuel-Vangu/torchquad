@@ -110,6 +110,9 @@ ENV/
 env.bak/
 venv.bak/
 
+# pixi (experimental manifest; the solved env dir is not tracked)
+.pixi/
+
 # Spyder project settings
 .spyderproject
 .spyproject

@@ -23,22 +23,31 @@ The CI/CD pipeline consists of five main workflows:
 
    **Triggers**: Push to main/develop branches, pull requests, manual dispatch
 
-   This is the core testing workflow that runs on every code change:
+   This is the core testing workflow that runs on every code change. All jobs
+   install dependencies with `uv <https://docs.astral.sh/uv/>`_ (CPU wheels),
+   which is much faster than conda in CI:
 
-   * **Lint Stage**: Uses `ruff <https://docs.astral.sh/ruff/>`_ to check
-     formatting (``ruff format --check``) and code quality (``ruff check``), and
-     `pydoclint <https://github.com/jsh9/pydoclint>`_ to check Google-style
-     docstring completeness and consistency.
-   * **Testing Stage**:
-     - Sets up the Python environment
-     - Installs all backend dependencies via micromamba
-     - Runs full pytest suite with coverage reporting
-     - Posts coverage reports as PR comments
+   * **Lint**: `ruff <https://docs.astral.sh/ruff/>`_ formatting
+     (``ruff format --check``) and code quality (``ruff check``), plus
+     `pydoclint <https://github.com/jsh9/pydoclint>`_ Google-style docstring
+     checks.
+   * **test**: all four backends installed across a Python 3.10/3.11/3.12
+     matrix (``fail-fast: false``). Skipped tests are errors
+     (``--error-for-skips``), so a silently-missing backend fails the build.
+     The 3.12 leg enforces the coverage floor (``--cov-fail-under``) and posts
+     the PR coverage comment.
+   * **test-single-backend**: pins JAX or TensorFlow in isolation (with a CPU
+     torch baseline for collection) so a breaking release of one backend is
+     caught on its own.
+   * **wheel-smoke**: builds the wheel, installs it clean, and runs the
+     built-in deployment self-test — catches packaging breakage before release.
+   * **docs-build**: ``sphinx-build -W`` (warnings as errors) so documentation
+     rot fails the PR instead of shipping silently to Read the Docs.
 
    **Key Features**:
 
-   * Multi-backend testing (all numerical backends)
-   * Coverage tracking with pytest-cov
+   * Multi-backend testing across a Python version matrix
+   * Coverage tracking with pytest-cov and an enforced floor
    * JUnit XML output for CI integration
    * Automated PR comments with test results
 
@@ -89,24 +98,34 @@ The CI/CD pipeline consists of five main workflows:
 Environment Setup
 -----------------
 
-The CI system uses conda/micromamba for dependency management:
+CI installs dependencies with `uv <https://docs.astral.sh/uv/>`_ (CPU wheels),
+which is the primary dev/CI toolchain:
 
 .. code-block:: yaml
 
    # From run_tests.yml
-   - name: provision-with-micromamba
-     uses: mamba-org/setup-micromamba@v1
+   - name: Set up uv
+     uses: astral-sh/setup-uv@v5
      with:
-       environment-file: environment_all_backends.yml
-       environment-name: torchquad
-       cache-downloads: true
+       enable-cache: true
+   - name: Install torchquad and all backends (CPU)
+     run: |
+       uv venv --python 3.12
+       uv pip install torch --index-url https://download.pytorch.org/whl/cpu
+       uv pip install "jax[cpu]" tensorflow numpy
+       uv pip install -e ".[dev]"
 
-Environment Files
-~~~~~~~~~~~~~~~~~
+Dependency management paths
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-* ``environment.yml`` - Basic PyTorch setup for development
-* ``environment_all_backends.yml`` - Complete backend support for CI
+* ``uv`` + ``uv.lock`` - primary reproducible dev/CI toolchain
+* ``environment.yml`` - basic conda setup for development
+* ``environment_all_backends.yml`` - complete backend support (conda path)
+* ``pixi.toml`` - experimental per-backend environments for pixi users
 * ``rtd_environment.yml`` - ReadTheDocs documentation builds
+
+Locally, ``uv sync --extra all`` (or ``uv pip install -e ".[dev]"`` plus the
+backend of your choice) reproduces the dev environment.
 
 Test Execution
 --------------

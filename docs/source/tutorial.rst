@@ -1113,36 +1113,40 @@ Example: Monte Carlo Error Estimation
 .. code:: ipython3
 
     import subprocess
+    import textwrap
     import numpy as np
-    
+
     def monte_carlo_error_estimation():
         """Estimate integration error using multiple independent Monte Carlo runs"""
         
-        # Script content for each GPU process
-        script_template = '''
-import os
-import torch
-from torchquad import MonteCarlo, set_up_backend
+        # Script content for each GPU process. textwrap.dedent strips the
+        # leading indentation at runtime, so the generated script is column-0
+        # valid Python while the source stays inside the RST code block.
+        script_template = textwrap.dedent('''\
+            import os
+            import torch
+            from torchquad import MonteCarlo, set_up_backend
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '{gpu_id}'
-set_up_backend("torch", data_type="float32")
+            os.environ['CUDA_VISIBLE_DEVICES'] = '{gpu_id}'
+            set_up_backend("torch", data_type="float32")
 
-def integrand(x):
-    return torch.sin(x[:, 0]) + torch.exp(x[:, 1])
+            def integrand(x):
+                return torch.sin(x[:, 0]) + torch.exp(x[:, 1])
 
-mc = MonteCarlo()
-result = mc.integrate(
-    integrand,
-    dim=2,
-    N=50000,
-    integration_domain=[[0, 1], [-1, 1]],
-    seed={seed},
-    backend="torch"
-)
+            mc = MonteCarlo()
+            result = mc.integrate(
+                integrand,
+                dim=2,
+                N=50000,
+                integration_domain=[[0, 1], [-1, 1]],
+                seed={seed},
+                backend="torch"
+            )
 
-print(result.item())
-'''
-        
+            print(result.item())
+            ''')
+
+
         num_gpus = torch.cuda.device_count()
         runs_per_gpu = 5
         
