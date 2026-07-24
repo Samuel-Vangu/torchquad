@@ -10,6 +10,8 @@ between backends (see REVIEW.md section 1):
   (issue #180); it has to be promoted to float and produce the correct result.
 """
 
+from importlib.util import find_spec
+
 import numpy as np
 import pytest
 import autoray as ar
@@ -33,19 +35,15 @@ _DETERMINISTIC_INTEGRATORS = [
     (GaussLegendre, 101),
 ]
 
-_ALL_BACKENDS = ["numpy", "torch", "jax", "tensorflow"]
+# Iterate JAX last: JAX and TensorFlow both preallocate all GPU memory, and
+# initializing JAX before TensorFlow causes OOM on GPU CI (see the ordering in
+# utils_integration_test.py).
+_ALL_BACKENDS = ["numpy", "torch", "tensorflow", "jax"]
 
 
 def _installed_backends():
-    """Return the subset of supported backends that are importable here."""
-    installed = []
-    for backend in _ALL_BACKENDS:
-        try:
-            __import__(backend)
-            installed.append(backend)
-        except ImportError:
-            pass
-    return installed
+    """Return the installed backends, in the safe _ALL_BACKENDS iteration order."""
+    return [backend for backend in _ALL_BACKENDS if find_spec(backend) is not None]
 
 
 def _to_float(result):
@@ -75,28 +73,34 @@ def test_cross_backend_agreement():
         ),
     ]
 
-    for integrand, dim, domain, expected in cases:
-        for integrator_cls, N in _DETERMINISTIC_INTEGRATORS:
-            results = {}
-            for backend in backends:
-                set_up_backend(backend, "float64")
-                integration_domain = anp.array(
-                    domain, like=backend, dtype=to_backend_dtype("float64", like=backend)
-                )
-                result = integrator_cls().integrate(
-                    integrand, dim=dim, N=N, integration_domain=integration_domain
-                )
-                results[backend] = _to_float(result)
+    # This test mutates global backend/precision state; restore the library
+    # default (numpy/float32) on exit so a later test relying on it is unaffected.
+    try:
+        for integrand, dim, domain, expected in cases:
+            for integrator_cls, N in _DETERMINISTIC_INTEGRATORS:
+                results = {}
+                for backend in backends:
+                    set_up_backend(backend, "float64")
+                    integration_domain = anp.array(
+                        domain, like=backend, dtype=to_backend_dtype("float64", like=backend)
+                    )
+                    result = integrator_cls().integrate(
+                        integrand, dim=dim, N=N, integration_domain=integration_domain
+                    )
+                    results[backend] = _to_float(result)
 
-            reference = results[backends[0]]
-            for backend, value in results.items():
-                assert abs(value - reference) < 1e-11, (
-                    f"{integrator_cls.__name__} (dim={dim}): {backend} disagrees with "
-                    f"{backends[0]} ({value} vs {reference})"
-                )
-                assert abs(value - expected) < 1e-9, (
-                    f"{integrator_cls.__name__} (dim={dim}): {backend} result {value} != {expected}"
-                )
+                reference = results[backends[0]]
+                for backend, value in results.items():
+                    assert abs(value - reference) < 1e-11, (
+                        f"{integrator_cls.__name__} (dim={dim}): {backend} disagrees with "
+                        f"{backends[0]} ({value} vs {reference})"
+                    )
+                    assert abs(value - expected) < 1e-9, (
+                        f"{integrator_cls.__name__} (dim={dim}): {backend} result "
+                        f"{value} != {expected}"
+                    )
+    finally:
+        set_up_backend("numpy", "float32")
 
 
 def _integer_domain_test(backend):
@@ -122,16 +126,17 @@ def _integer_domain_test(backend):
         )
 
 
+# Defined in the safe _ALL_BACKENDS order (JAX last) to avoid GPU OOM.
 test_integer_domain_numpy = setup_test_for_backend(_integer_domain_test, "numpy", None)
 test_integer_domain_torch = setup_test_for_backend(_integer_domain_test, "torch", None)
-test_integer_domain_jax = setup_test_for_backend(_integer_domain_test, "jax", None)
 test_integer_domain_tensorflow = setup_test_for_backend(_integer_domain_test, "tensorflow", None)
+test_integer_domain_jax = setup_test_for_backend(_integer_domain_test, "jax", None)
 
 
 if __name__ == "__main__":
     test_cross_backend_agreement()
     test_integer_domain_numpy()
     test_integer_domain_torch()
-    test_integer_domain_jax()
     test_integer_domain_tensorflow()
+    test_integer_domain_jax()
     print("All cross-backend tests passed!")
