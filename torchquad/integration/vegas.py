@@ -41,6 +41,7 @@ class VEGAS(BaseIntegrator):
         max_iterations=20,
         use_warmup=True,
         backend=None,
+        args=None,
     ):
         """Integrates the passed function on the passed domain using VEGAS.
 
@@ -60,6 +61,7 @@ class VEGAS(BaseIntegrator):
             max_iterations (int, optional): Maximum number of vegas iterations to perform. The number of performed iterations is usually lower than this value because the number of sample points per iteration increases every fifth iteration. Defaults to 20.
             use_warmup (bool, optional): If True, execute a warmup to initialize the vegas map. Defaults to True.
             backend (string, optional): Numerical backend. "jax" and "tensorflow" are unsupported. Defaults to integration_domain's backend if it is a tensor and otherwise to the backend from the latest call to set_up_backend or "torch" for backwards compatibility.
+            args (list or tuple, optional): Extra arguments passed to the integrand as ``fn(points, *args)``. Defaults to None.
 
         Raises:
             ValueError: If the integration_domain or backend argument is invalid
@@ -105,9 +107,10 @@ class VEGAS(BaseIntegrator):
         domain_starts = integration_domain[:, 0]
         domain_sizes = integration_domain[:, 1] - domain_starts
         domain_volume = anp.prod(domain_sizes)
+        extra_args = () if args is None else args
 
         def transformed_integrand(x):
-            return fn(x * domain_sizes + domain_starts) * domain_volume
+            return fn(x * domain_sizes + domain_starts, *extra_args) * domain_volume
 
         self._fn = transformed_integrand
 
