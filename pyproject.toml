@@ -37,7 +37,8 @@ packages = ["torchquad", "torchquad.integration", "torchquad.utils"]
 
 [tool.ruff]
 line-length = 100
-extend-exclude = ["my_notebooks", "build", "dist"]
+# .vulture_whitelist.py is a vulture artifact (bare-name references), not runnable code
+extend-exclude = ["my_notebooks", "build", "dist", ".vulture_whitelist.py"]
 
 [tool.ruff.lint]
 # The default selection (E4/E7/E9/F) already covers the severe-error gate
@@ -50,13 +51,18 @@ ignore = ["E203", "E402", "E501"]
 
 [tool.pydoclint]
 style = "google"
-# Signature type hints are deferred to the 0.7 typing pass (roadmap R9);
-# docstrings carry the types for now, so only check docstring completeness
-# and consistency (missing Args/Returns/Raises), not signature annotations.
+# Argument type hints are not required in signatures; the docstrings carry the
+# types. Only docstring completeness and consistency (missing Args/Returns/Raises)
+# is checked, not signature annotations.
 arg-type-hints-in-signature = false
 check-return-types = false
 check-yield-types = false
 skip-checking-short-docstrings = true
+# torchquad documents constructor arguments in the __init__ docstring rather
+# than the class docstring, so allow that. Class-attribute cross-checking is
+# too format-sensitive to enforce and is out of scope for the docstring gate.
+allow-init-docstring = true
+check-class-attributes = false
 
 [tool.vulture]
 paths = ["torchquad"]
