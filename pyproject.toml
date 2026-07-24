@@ -30,6 +30,44 @@ dependencies = [
     "autoray>=0.5.0",
 ]
 
+# PEP 508 cannot encode per-index URLs, so the backend extras below install
+# from the default package index. `jax[cpu]` and `tensorflow` are CPU builds;
+# `torch`, however, is CPU on macOS/Windows but the CUDA build on Linux (that is
+# how PyTorch publishes to PyPI). For a guaranteed-CPU torch, or for any GPU
+# build, follow each framework's own install guide (they need CUDA/ROCm-specific
+# wheels and index URLs a plain extra cannot express). JAX and TensorFlow GPU
+# wheels are Linux/WSL2-only.
+[project.optional-dependencies]
+# Development toolchain for the CI lint + test gates. ruff, pydoclint, vulture,
+# and pytest floors match the versions pinned in the CI workflows; the rest are
+# reasonable minimums, not lockstep pins.
+dev = [
+    "pytest>=6.2.1",
+    "pytest-cov>=4.0.0",
+    "pytest-error-for-skips>=2.0.2",
+    "ruff>=0.14.6",
+    "pydoclint>=0.8.3",
+    "vulture>=2.14",
+    "pre-commit>=3.5.0",
+    "build>=1.0.0",
+    "twine>=4.0.0",
+]
+docs = [
+    "sphinx>=3.4.3",
+    "sphinx_rtd_theme>=0.5.1",
+]
+# Default-index backend conveniences (see the note above: torch is CUDA on
+# Linux). For a guaranteed CPU torch or any GPU build, use the framework's guide.
+torch = ["torch>=2.1"]
+jax = ["jax[cpu]>=0.4.17"]
+tensorflow = ["tensorflow>=2.18.0"]
+# Recursive extras keep the backend floors defined in exactly one place each.
+all = [
+    "torchquad[torch]",
+    "torchquad[jax]",
+    "torchquad[tensorflow]",
+]
+
 [project.urls]
 Homepage = "https://github.com/esa/torchquad"
 Source = "https://github.com/esa/torchquad/"
