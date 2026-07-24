@@ -136,6 +136,7 @@ my_notebooks
 pytest-coverage.txt
 pytest.xml
 CLAUDE.md
+CLAUDE.local.md
 .claude/
 
 # Crash artifacts (e.g. from Git-for-Windows / Cygwin)

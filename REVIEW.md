@@ -20,10 +20,14 @@ This is the headline feature. A crash is recoverable; a wrong number in a cited
 paper is not. Scrutinise anything touching a numerical kernel
 (`integration/`, weights, grids, RNG, VEGAS map/stratification).
 
-- **Compare against analytic ground truth.** New or changed integrators must be
-  checked against the closed-form integrals in
-  `tests/integration_test_functions.py`, not just "runs without error". A bug fix
-  needs a regression test that would fail on the old code.
+- **Compare against analytic ground truth.** New or changed integrators, samplers,
+  and error estimates must be checked against the closed-form integrals in
+  `tests/integration_test_functions.py`, not just "runs without error" — and
+  against the **whole** collection via `helper_functions.py::compute_integration_test_errors`
+  (real + complex, 1-D/3-D/10-D), not one or two ad-hoc integrands. A *reported
+  error* (e.g. VEGAS's `sdev`/`chi2`) must itself be validated against the true
+  error from these functions, not merely bound-checked. A bug fix needs a
+  regression test that would fail on the old code.
 - **A loosened tolerance is a finding until justified.** If an assertion's
   tolerance was widened to make a test pass, the PR must explain *why* the extra
   error is real hardware/reduction-order non-associativity and not a genuine
