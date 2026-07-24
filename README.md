@@ -93,9 +93,9 @@ This is a brief guide for how to set up torchquad.
 
 ### Prerequisites
 
-We recommend using [conda](https://anaconda.org/conda-forge/torchquad), especially if you want to utilize the GPU.
-With PyTorch it will automatically set up CUDA and the cudatoolkit for you, for example.
-Note that torchquad also works on the CPU; however, it is optimized for GPU usage. torchquad's GPU support is tested only on NVIDIA cards with CUDA. We are investigating future support for AMD cards through [ROCm](https://pytorch.org/blog/pytorch-for-amd-rocm-platform-now-available-as-python-package/).
+torchquad has no backend pinned as a hard dependency — install the numerical backend(s) you want (PyTorch, JAX, TensorFlow) alongside it. It also runs on NumPy alone. Any of pip, [uv](https://docs.astral.sh/uv/), or conda works; pick whichever fits your workflow.
+
+Note that torchquad also works on the CPU; however, it is optimized for GPU usage. GPU support is tested only on NVIDIA cards with CUDA. For GPU installs, follow each framework's own install guide — the CPU-only convenience extras below cannot select GPU wheels, and JAX/TensorFlow GPU builds are Linux/WSL2-only.
 
 For a detailed list of required packages and packages for numerical backends,
 please refer to the conda environment files [environment.yml](/environment.yml) and [environment_all_backends.yml](/environment_all_backends.yml).
@@ -104,38 +104,41 @@ torchquad requires Python 3.10 or newer. Its CI suite runs on Python 3.12 with J
 
 ### Installation
 
-The easiest way to install torchquad is simply to
+Install torchquad from PyPI:
+   ```sh
+   pip install torchquad
+   # or, with uv:
+   uv pip install torchquad
+   ```
+
+It is also available on conda-forge:
    ```sh
    conda install torchquad -c conda-forge
    ```
 
-Alternatively, it is also possible to use
+**Adding a backend (CPU).** torchquad ships convenience extras that pull in the
+CPU build of a backend from the default package index:
    ```sh
-   pip install torchquad
+   pip install "torchquad[torch]"        # PyTorch (CPU)
+   pip install "torchquad[jax]"          # JAX (CPU)
+   pip install "torchquad[tensorflow]"   # TensorFlow (CPU)
+   pip install "torchquad[all]"          # all three (CPU)
    ```
 
-The PyTorch backend with CUDA support can be installed with
+**Adding a backend (GPU).** These extras cannot select GPU wheels (a Python
+package cannot encode the CUDA-specific index URLs each framework needs), so for
+GPU support install the backend from its own guide, then `pip install torchquad`:
+   - PyTorch: <https://pytorch.org/get-started/locally/>
+   - JAX (Linux/WSL2 only): <https://docs.jax.dev/en/latest/installation.html>
+   - TensorFlow (Linux/WSL2 only): <https://www.tensorflow.org/install/gpu>
+
+For a full multi-backend setup, the conda file
+[environment_all_backends.yml](/environment_all_backends.yml) installs every
+backend (CPU) in one step:
    ```sh
-   conda install "cudatoolkit>=11.1" "pytorch>=2.1=*cuda*" -c conda-forge -c pytorch
+   conda env create -f environment_all_backends.yml
+   conda activate torchquad
    ```
-
-Note that since PyTorch is not yet on *conda-forge* for Windows, we have explicitly included it here using `-c pytorch`.
-Note also that installing PyTorch with *pip* may **not** set it up with CUDA support. Therefore, we recommend to use *conda*.
-
-Here are installation instructions for other numerical backends:
-   ```sh
-   conda install "tensorflow>=2.6.0=cuda*" -c conda-forge
-   pip install "jax[cuda]>=0.4.17" --find-links https://storage.googleapis.com/jax-releases/jax_cuda_releases.html # linux only
-   conda install "numpy>=1.19.5" -c conda-forge
-   ```
-
-More installation instructions for numerical backends can be found in
-[environment_all_backends.yml](/environment_all_backends.yml) and at the
-backend documentations, for example
-https://pytorch.org/get-started/locally/,
-https://github.com/google/jax/#installation and
-https://www.tensorflow.org/install/gpu, and often there are multiple ways to
-install them.
 
 
 ### Test
@@ -349,7 +352,7 @@ Distributed under the GPL-3.0 License. See [LICENSE](https://github.com/esa/torc
 <!-- FAQ -->
 ## FAQ
 
-  1. Q: `Error enabling CUDA. cuda.is_available() returned False. CPU will be used.`  <br/>A: This error indicates that PyTorch could not find a CUDA-compatible GPU. Either you have no compatible GPU or the necessary CUDA requirements are missing. Using `conda`, you can install them with `conda install cudatoolkit`. For more detailed installation instructions, please refer to the [PyTorch documentation](https://pytorch.org/get-started/locally/).
+  1. Q: `Error enabling CUDA. cuda.is_available() returned False. CPU will be used.`  <br/>A: This error indicates that PyTorch could not find a CUDA-compatible GPU. Either you have no compatible GPU or your PyTorch build has no CUDA support. Install a CUDA-enabled PyTorch build following the [PyTorch install guide](https://pytorch.org/get-started/locally/).
 
 
 

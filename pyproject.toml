@@ -30,6 +30,40 @@ dependencies = [
     "autoray>=0.5.0",
 ]
 
+# PEP 508 cannot encode per-index URLs, so the backend extras below install only
+# the default-index CPU builds. For GPU/accelerator builds, follow each
+# framework's own install guide (they need CUDA/ROCm-specific wheels and index
+# URLs that a plain extra cannot express). JAX and TensorFlow GPU wheels are
+# Linux/WSL2-only.
+[project.optional-dependencies]
+# Development toolchain — mirrors the CI lint + test gates. Version floors track
+# the pins used in the CI workflows; bump both together.
+dev = [
+    "pytest>=6.2.1",
+    "pytest-cov>=4.0.0",
+    "pytest-error-for-skips>=2.0.2",
+    "ruff>=0.14.6",
+    "pydoclint>=0.8.3",
+    "vulture>=2.14",
+    "pre-commit>=3.5.0",
+    "build>=1.0.0",
+    "twine>=4.0.0",
+]
+docs = [
+    "sphinx>=3.4.3",
+    "sphinx_rtd_theme>=0.5.1",
+]
+# CPU/default-index backend conveniences. For GPU support, install the framework
+# from its own guide instead of using these extras.
+torch = ["torch>=2.1"]
+jax = ["jax[cpu]>=0.4.17"]
+tensorflow = ["tensorflow>=2.18.0"]
+all = [
+    "torch>=2.1",
+    "jax[cpu]>=0.4.17",
+    "tensorflow>=2.18.0",
+]
+
 [project.urls]
 Homepage = "https://github.com/esa/torchquad"
 Source = "https://github.com/esa/torchquad/"
