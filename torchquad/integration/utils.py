@@ -3,22 +3,14 @@ Utility functions for the integrator implementations including extensions for
 autoray, which are registered when importing this file
 """
 
-import sys
-from pathlib import Path
-
-# Change the path to import from the parent folder.
-# A relative import currently does not work when executing the tests.
-sys.path.append(str(Path(__file__).absolute().parent.parent))
-
 from autoray import numpy as anp
 from autoray import infer_backend, register_function
 from functools import partial
 from loguru import logger
 import warnings
 
-# from ..utils.set_precision import _get_precision
-from utils.set_precision import _get_precision
-from utils.set_up_backend import _get_default_backend
+from ..utils.set_precision import _get_precision
+from ..utils.set_up_backend import _get_default_backend
 
 
 def _linspace_with_grads(start, stop, N, requires_grad):
@@ -269,9 +261,6 @@ def expand_func_values_and_squeeze_integral(f):
         )
 
         if is_1d:
-            warnings.warn(
-                "DEPRECATION WARNING: In future versions of torchquad, an array-like object will be returned."
-            )
             if len(args) > 1:
                 # Modify positional arguments
                 args = (args[0], anp.expand_dims(function_values, axis=1), *args[2:])
