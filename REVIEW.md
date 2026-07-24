@@ -126,10 +126,11 @@ CLAUDE.md rules 8, 10, 13.
   visible — grep `pyproject.toml`'s `filterwarnings` so it isn't suppressed. A
   suppressed self-deprecation warning that never resolves is exactly the anti-pattern
   being removed in 0.6.
-- Public names must not start with an underscore (the `_deployment_test` export
-  was the archetype; it is now `deployment_test` with a deprecated alias). No
-  abbreviations in new code: `integration_domain` not `int_dom`,
-  `function_values` not `fvals`.
+- A name in `__all__` must not start with an underscore — the two contradict each
+  other. `_deployment_test` was the archetype (underscore *and* in `__all__`); the
+  fix was to drop it from `__all__` and keep it private (it is an internal
+  self-test, not user-facing), not to make it public. No abbreviations in new
+  code: `integration_domain` not `int_dom`, `function_values` not `fvals`.
 
 ## 8. Simplicity, size budgets, dataclasses
 

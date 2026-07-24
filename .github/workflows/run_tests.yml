@@ -140,7 +140,7 @@ jobs:
           uv venv --python 3.12
           source .venv/bin/activate
           uv pip install dist/*.whl
-          python -c "import torchquad; assert torchquad.deployment_test()"
+          python -c "import torchquad; assert torchquad._deployment_test()"
 
   # Documentation build gate: warnings are errors so doc rot fails the PR
   # instead of silently shipping to Read the Docs.

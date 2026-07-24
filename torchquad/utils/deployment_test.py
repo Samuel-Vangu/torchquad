@@ -16,8 +16,12 @@ from loguru import logger
 import warnings
 
 
-def deployment_test():
+def _deployment_test():
     """Comprehensive test to verify successful deployment of torchquad.
+
+    Private by design: this is an internal post-release self-test, kept out of
+    the public API (and out of autocomplete) via the leading underscore. It is
+    invoked by the wheel-smoke CI job and the deployment tests, not by users.
 
     This method is used internally to check successful deployment after PyPI releases.
     It verifies:
@@ -256,24 +260,6 @@ def deployment_test():
     else:
         logger.info("✓ Deployment test completed successfully!")
         return True
-
-
-def _deployment_test():
-    """Deprecated alias for :func:`deployment_test`.
-
-    The public name gained a leading underscore by mistake; it is kept working
-    for one release and will be removed in 0.7.
-
-    Returns:
-        bool: Whatever :func:`deployment_test` returns.
-    """
-    warnings.warn(
-        "_deployment_test is deprecated and will be removed in 0.7; "
-        "use torchquad.deployment_test instead.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    return deployment_test()
 
 
 def _get_exp_func(x):
