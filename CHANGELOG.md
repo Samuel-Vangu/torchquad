@@ -11,6 +11,9 @@ The 0.6 line is a modernization and credibility release: modern tooling, honest
 packaging, and closing long-open fixed issues.
 
 ### Added
+- `Sobol` quasi-Monte Carlo sampler, usable via
+  `MonteCarlo.integrate(..., rng=Sobol(...))` for faster convergence on smooth
+  integrands (#140).
 - Optional-dependency extras: `dev`, `docs`, and CPU-convenience backend extras
   `torch`, `jax`, `tensorflow`, `all`.
 - `release_testing/` suite — slower end-to-end checks run against the latest

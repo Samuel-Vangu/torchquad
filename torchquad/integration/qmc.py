@@ -1,3 +1,5 @@
+import warnings
+
 from autoray import numpy as anp
 
 
@@ -57,6 +59,16 @@ class Sobol:
             backend tensor: ``[number_of_points, dim]`` Sobol points in ``[0, 1)``.
         """
         number_of_points, dim = int(size[0]), int(size[1])
+
+        # Warn on non-power-of-two counts uniformly across backends: SciPy already
+        # warns on its own path, but torch's SobolEngine would silently return a
+        # sequence prefix whose balance properties do not hold.
+        if self._backend == "torch" and number_of_points & (number_of_points - 1) != 0:
+            warnings.warn(
+                "The balance properties of Sobol points require the number of "
+                f"points to be a power of 2, but {number_of_points} was requested.",
+                stacklevel=2,
+            )
 
         if self._backend == "torch":
             # SobolEngine keeps the points as native torch tensors (mirrors how

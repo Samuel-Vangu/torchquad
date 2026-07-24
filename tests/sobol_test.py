@@ -45,7 +45,10 @@ def _sobol_accuracy_test(backend, dtype_name=None):
             rng=Sobol(backend=backend, seed=0),
         )
     )
-    assert abs(result - _EXPECTED) < 1e-3, (
+    # Tight enough to fail if Sobol silently degraded to plain-MC quality
+    # (~1e-4). The measured error is ~2e-8 on the SciPy backends and ~5e-7 on
+    # torch's native SobolEngine; 1e-5 clears both with a comfortable margin.
+    assert abs(result - _EXPECTED) < 1e-5, (
         f"Sobol result {result} too far from analytic {_EXPECTED}"
     )
 
