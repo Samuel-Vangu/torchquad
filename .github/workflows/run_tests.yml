@@ -55,6 +55,9 @@ jobs:
       - name: Test with pytest
         shell: bash -l {0}
         run: |
+          # Fail the step if pytest fails: without pipefail the pipe to tee
+          # below would mask pytest's non-zero exit code and report success.
+          set -o pipefail
           micromamba activate torchquad
           pip install -e .
           cd tests/
