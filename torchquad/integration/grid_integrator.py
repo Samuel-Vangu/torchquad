@@ -2,9 +2,8 @@ from loguru import logger
 from autoray import numpy as anp, infer_backend
 
 from .base_integrator import BaseIntegrator
-from .integration_grid import IntegrationGrid
+from .integration_grid import IntegrationGrid, grid_func
 from .utils import (
-    _linspace_with_grads,
     expand_func_values_and_squeeze_integral,
     _setup_integration_domain,
     _torch_trace_without_warnings,
@@ -19,17 +18,19 @@ class GridIntegrator(BaseIntegrator):
 
     @property
     def _grid_func(self):
-        def f(integration_domain, N, requires_grad=False, backend=None):
-            a = integration_domain[0]
-            b = integration_domain[1]
-            return _linspace_with_grads(a, b, N, requires_grad=requires_grad)
+        """Grid-point generator used to build the integration grid.
 
-        return f
+        Newton-Cotes rules integrate over a uniform grid, so the default is the
+        shared :func:`~torchquad.integration.integration_grid.grid_func`.
+        Subclasses such as Gaussian override this to place points at
+        rule-specific nodes instead of a uniform linspace.
+        """
+        return grid_func
 
     def _weights(self, N, dim, backend, requires_grad=False):
         return None
 
-    def integrate(self, fn, dim, N, integration_domain, backend):
+    def integrate(self, fn, dim, N, integration_domain, backend, args=None):
         """Integrate the passed function on the passed domain using a Composite Newton Cotes rule.
         The argument meanings are explained in more detail in the sub-classes.
 
@@ -39,6 +40,7 @@ class GridIntegrator(BaseIntegrator):
             N (int): Total number of sample points to use for the integration.
             integration_domain (list or backend tensor): Integration domain, e.g. [[-1,1],[0,1]]. It can also determine the numerical backend.
             backend (string): Numerical backend. Ignored if it can be inferred from integration_domain.
+            args (list or tuple, optional): Extra arguments passed to the integrand as ``fn(points, *args)``. Defaults to None.
 
         Returns:
             float: integral value
@@ -55,7 +57,7 @@ class GridIntegrator(BaseIntegrator):
 
         logger.debug("Evaluating integrand on the grid.")
         function_values, num_points = self.evaluate_integrand(
-            fn, grid_points, weights=self._weights(n_per_dim, dim, backend)
+            fn, grid_points, weights=self._weights(n_per_dim, dim, backend), args=args
         )
         self._nr_of_fevals = num_points
 
