@@ -18,6 +18,24 @@ So, unless you are fixing docs for the *current release*, branch off `develop`
 and open your PR against `develop`. Releases are cut by merging `develop` into
 `main`, tagging, and publishing; `main` therefore stays a subset of `develop`.
 
+## Development setup
+
+Fork and clone the repo, then set up an editable install with all backends and
+the dev tooling. Either uv or conda works:
+
+```bash
+# uv (fast, CPU wheels)
+uv pip install -e ".[dev,all]"
+
+# or conda (installs every backend, CPU)
+conda env create -f environment_all_backends.yml
+conda activate torchquad
+pip install -e ".[dev]"
+```
+
+See the [installation docs](https://torchquad.readthedocs.io/en/main/install.html)
+for GPU builds and per-backend options.
+
 ## Before you push
 
 CI enforces formatting, linting, docstrings, dead-code, and the full test suite.

@@ -8,27 +8,22 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    # The environment must match the trusted publisher configured on Test PyPI.
-    environment: testpypi
-    permissions:
-      # OIDC token for Test PyPI trusted publishing — no stored API token needed.
-      id-token: write
-      # Declaring any permission drops the rest to none, so restore read access
-      # for checkout (don't rely on the repo staying public).
-      contents: read
 
     steps:
       - uses: actions/checkout@v4
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v5
-      - name: Build sdist and wheel
-        run: uv build
-      - name: Publish to Test PyPI
-        # release/v1 is PyPA's intentionally auto-tracking major ref; Dependabot
-        # cannot bump a branch ref, so this action is updated by PyPA, not us.
-        uses: pypa/gh-action-pypi-publish@release/v1
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          repository-url: https://test.pypi.org/legacy/
-          # TestPyPI versions are immutable; a re-triggered release for an
-          # already-published version should be a no-op, not a red workflow.
-          skip-existing: true
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          pip install build twine
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+      - name: Build and publish to Test PyPI
+        env:
+          TWINE_USERNAME: "__token__"
+          TWINE_PASSWORD: ${{ secrets.TEST_PYPI_TOKEN }}
+          TORCHQUAD_RELEASE_BUILD: "True"
+        run: |
+          python -m build
+          twine upload -r testpypi dist/*

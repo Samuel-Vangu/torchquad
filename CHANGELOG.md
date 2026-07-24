@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 The 0.6 line is a modernization and credibility release: modern tooling, honest
-packaging, and closing long-open fixed issues. See `roadmap.md` for the plan.
+packaging, and closing long-open fixed issues.
 
 ### Added
 - Optional-dependency extras: `dev`, `docs`, and CPU-convenience backend extras
@@ -22,7 +22,7 @@ packaging, and closing long-open fixed issues. See `roadmap.md` for the plan.
   coverage floor.
 - `pre-commit` + `pydoclint` docstring checks and a two-tier `vulture`
   dead-code job.
-- Dependabot for GitHub Actions and OIDC trusted publishing to PyPI/Test PyPI.
+- Dependabot for GitHub Actions.
 - This `CHANGELOG.md`.
 
 ### Changed

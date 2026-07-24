@@ -307,38 +307,11 @@ python benchmarking/plot_results.py
 
 The project is open to community contributions. Feel free to open an [issue](https://github.com/esa/torchquad/issues) or write us an email if you would like to discuss a problem or idea first.
 
-If you want to contribute, please
-
-1. Fork the project on [GitHub](https://github.com/esa/torchquad).
-2. Get the most up-to-date code by following this quick guide for installing torchquad from source:
-     1. Get [miniconda](https://docs.conda.io/en/latest/miniconda.html) or similar
-     2. Clone the repo
-      ```sh
-      git clone https://github.com/esa/torchquad.git
-      ```
-     3. With the default configuration, all numerical backends with CUDA
-       support are installed.
-       If this should not happen, comment out unwanted packages in
-       `environment_all_backends.yml`.
-     4. Set up the environment. This creates a conda environment called
-      `torchquad` and installs the required dependencies.
-      ```sh
-      conda env create -f environment_all_backends.yml
-      conda activate torchquad
-      ```
-
-Once the installation is done, you are ready to contribute.
-Please note that PRs should be created from and into the `develop` branch. For each release the develop branch is merged into main.
-
-3. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-4. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-5. Push to the Branch (`git push origin feature/AmazingFeature`)
-6. Open a Pull Request on the `develop` branch, *not* `main`
-
-and we will have a look at your contribution as soon as we can.
-
-Furthermore, please make sure that your PR passes all automated tests, you can ping `@gomezzz` to run the CI. Review will only happen after that.
-Only PRs created on the `develop` branch with all tests passing will be considered. The only exception to this rule is if you want to update the documentation in relation to the current release on conda / pip. In that case you open a PR directly into `main`.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide — how to set up a
+development environment, the checks CI runs, and the review process. In short:
+fork the repo, branch off `develop`, and open your pull request against
+`develop` (not `main`). Documentation fixes for the *current release* are the
+only exception and may target `main` directly.
 
 <!-- LICENSE -->
 ## License
