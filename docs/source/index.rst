@@ -19,7 +19,7 @@
    :alt: Tests
 
 .. image:: https://img.shields.io/github/last-commit/esa/torchquad
-   :target: https://github.com/esa/torchquad/commits
+   :target: https://github.com/esa/torchquad/commits/main
    :alt: GitHub last commit
 
 .. image:: https://img.shields.io/github/license/esa/torchquad
