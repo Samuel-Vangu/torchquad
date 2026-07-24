@@ -10,7 +10,7 @@ This tutorial gives a more detailed look at its functionality and explores some 
 Minimal working example
 -----------------------
 
-.. code:: ipython3
+.. code:: python
 
     # To avoid copying things to GPU memory,
     # ideally allocate everything in torch on the GPU
@@ -119,7 +119,7 @@ Imports
 
 Now let's get started! First, the general imports:
 
-.. code:: ipython3
+.. code:: python
 
     import scipy
     import numpy as np
@@ -142,7 +142,7 @@ Now let's get started! First, the general imports:
     from torchquad.utils.set_precision import set_precision
     import torchquad
 
-.. code:: ipython3
+.. code:: python
 
     # Use this to enable GPU support and set the floating point precision
     set_up_backend("torch", data_type="float32")
@@ -172,7 +172,7 @@ Let ``f(x)`` be the function :math:`f(x) = e^{x} \cdot x^{2}`. Over the domain
 Let's declare the function and a simple function to print the absolute error,
 as well as remember the correct result.
 
-.. code:: ipython3
+.. code:: python
 
     def f(x):
 
@@ -191,7 +191,7 @@ are and stay on the GPU.**
 
 Let's plot the function briefly.
 
-.. code:: ipython3
+.. code:: python
 
     points = torch.linspace(0, 2, 100)
     # Note that for plotting we have to move the values to the CPU first
@@ -202,7 +202,7 @@ Let's plot the function briefly.
 
 Let's define the integration domain, set the precision to double, and initialize the integrator - let's start with the trapezoid rule.
 
-.. code:: ipython3
+.. code:: python
 
     # Integration domain is a list of lists to allow arbitrary dimensionality.
     integration_domain = [[0, 2]]
@@ -211,7 +211,7 @@ Let's define the integration domain, set the precision to double, and initialize
 
 Now we are all set to compute the integral. Let's try it with just 101 sample points for now.
 
-.. code:: ipython3
+.. code:: python
 
     result = tp.integrate(f, dim=1, N=101, integration_domain=integration_domain)
     print_error(result, solution)
@@ -226,7 +226,7 @@ Now we are all set to compute the integral. Let's try it with just 101 sample po
 This is quite close already, as 1-D integrals are comparatively easy.
 Let's see what type of value we get for different integrators.
 
-.. code:: ipython3
+.. code:: python
 
     simp = Simpson()
     result = simp.integrate(f, dim=1, N=101, integration_domain=integration_domain)
@@ -240,7 +240,7 @@ Let's see what type of value we get for different integrators.
             Rel. Error: 0.00000000e+00
 
 
-.. code:: ipython3
+.. code:: python
 
     mc = MonteCarlo()
     result = mc.integrate(f, dim=1, N=101, integration_domain=integration_domain)
@@ -254,7 +254,7 @@ Let's see what type of value we get for different integrators.
             Rel. Error: 4.30584885e-02
 
 
-.. code:: ipython3
+.. code:: python
 
     vegas = VEGAS()
     result = vegas.integrate(f, dim=1, N=101, integration_domain=integration_domain)
@@ -287,7 +287,7 @@ Over the domain :math:`[0,1]^{10}`, the integral of ``f_2`` is
 
 Plotting this is tricky, so let's directly move to the integrals.
 
-.. code:: ipython3
+.. code:: python
 
     def f_2(x):
         return torch.sum(torch.sin(x), dim=1)
@@ -300,13 +300,13 @@ Let's start with just 3 points per dimension, i.e., :math:`3^{10}=59,049` sampl
 **Note**: *torchquad* currently only supports equal numbers of points per dimension.
 We are working on giving the user more flexibility on this point.
 
-.. code:: ipython3
+.. code:: python
 
     # Integration domain is a list of lists to allow arbitrary dimensionality
     integration_domain = [[0, 1]] * 10
     N = 3 ** 10
 
-.. code:: ipython3
+.. code:: python
 
     tp = Trapezoid()  # Initialize a trapezoid solver
     result = tp.integrate(f_2, dim=10, N=N, integration_domain=integration_domain)
@@ -319,7 +319,7 @@ We are working on giving the user more flexibility on this point.
             Abs. Error: 9.61723328e-02
             Rel. Error: 2.09207758e-02
 
-.. code:: ipython3
+.. code:: python
 
     simp = Simpson()  # Initialize Simpson solver
     result = simp.integrate(f_2, dim=10, N=N, integration_domain=integration_domain)
@@ -332,7 +332,7 @@ We are working on giving the user more flexibility on this point.
             Abs. Error: 1.64651871e-03
             Rel. Error: 3.58174206e-04
 
-.. code:: ipython3
+.. code:: python
 
     boole = Boole()  # Initialize Boole solver
     result = boole.integrate(f_2, dim=10, N=N, integration_domain=integration_domain)
@@ -347,7 +347,7 @@ We are working on giving the user more flexibility on this point.
             
 
 
-.. code:: ipython3
+.. code:: python
 
     mc = MonteCarlo()
     result = mc.integrate(f_2, dim=10, N=N, integration_domain=integration_domain, seed=42)
@@ -360,7 +360,7 @@ We are working on giving the user more flexibility on this point.
             Abs. Error: 1.32608414e-03
             Rel. Error: 2.88468727e-04
 
-.. code:: ipython3
+.. code:: python
 
     vegas = VEGAS()
     result = vegas.integrate(f_2, dim=10, N=N, integration_domain=integration_domain)
@@ -395,7 +395,7 @@ we will stick to a 5-D version of the :math:`\sin(x)` of the previous
 section. Let's declare it with numpy and torch. NumPy arrays will
 remain on the CPU and torch tensor on the GPU.
 
-.. code:: ipython3
+.. code:: python
 
     dimension = 5
     integration_domain = [[0, 1]] * dimension
@@ -409,7 +409,7 @@ remain on the CPU and torch tensor on the GPU.
 
 Now let's evaluate the integral using the scipy function ``nquad``.
 
-.. code:: ipython3
+.. code:: python
 
     start = time.time()
     opts = {"limit": 10, "epsabs": 1, "epsrel": 1}
@@ -437,7 +437,7 @@ machine (this might take shorter or longer on your machine). The integral was co
 In any event, *torchquad* can reach the same accuracy much, much quicker
 by utilizing the GPU.
 
-.. code:: ipython3
+.. code:: python
 
     N = 37 ** dimension
     simp = Simpson()  # Initialize Simpson solver
@@ -486,7 +486,7 @@ Using different backends with torchquad
 This section shows how to select a different numerical backend for the quadrature.
 Let's change the minimal working example so that it uses Tensorflow instead of PyTorch:
 
-.. code:: ipython3
+.. code:: python
 
     import tensorflow as tf
     from torchquad import MonteCarlo, set_up_backend
@@ -536,7 +536,7 @@ Computing gradients with respect to the integration domain
 We selected the composite Trapezoid rule and the Monte Carlo method to showcase that getting gradients is possible for both deterministic and stochastic methods.
 
 
-.. code:: ipython3
+.. code:: python
 
     import torch
     from torchquad import MonteCarlo, Trapezoid, set_up_backend
@@ -601,7 +601,7 @@ same number of points ``N``, dimensionality ``dim``, and shape of the ``integran
 (see :ref:`the next section <multi_dim_integrand>` for more information on integrands),
 we can JIT-compile the performance-relevant parts of the integrate method:
 
-.. code:: ipython3
+.. code:: python
 
     import time
     import torch
@@ -704,7 +704,7 @@ However, separate sample point calculation has some disadvantages:
 Here is an example where we integrate two functions with Boole and use the same
 sample points for both functions:
 
-.. code:: ipython3
+.. code:: python
 
     import torch
     from torchquad import Boole
@@ -746,7 +746,7 @@ Our inspiration for this came from scipy's own vectorization capabilities e.g., 
 
 As an example, here we evaluate a similar integrand many times for different values of ``a`` and ``b``. This is an example that could be sped up by a vectorized evaluation of all integrals:
 
-.. code:: ipython3
+.. code:: python
 
     def parametrized_integrand(x, a, b):
         return torch.sqrt(torch.cos(torch.sin((a + b) * x)))
@@ -759,7 +759,7 @@ As an example, here we evaluate a similar integrand many times for different val
 
 Now let's see how to do this a bit more simply, and in a way that provides signficant speedup as the size of the integrand's ``grid`` grows:
 
-.. code:: ipython3
+.. code:: python
 
     grid = torch.stack([torch.Tensor([a + b for a in a_params]) for b in b_params])
 
@@ -788,7 +788,7 @@ for multiple values of :math:`a` and :math:`b` simultaneously.
 
 Currently, torchquad doesn't have built-in support for parametric domains, but you can extend the existing integrators to handle this case. Below is an example of how to create a custom integrator that supports batch 1D integration with variable domains:
 
-.. code:: ipython3
+.. code:: python
 
     import torch
     from loguru import logger
@@ -889,7 +889,7 @@ Currently, torchquad doesn't have built-in support for parametric domains, but y
 
 Now let's see a concrete example of using this for parametric integration:
 
-.. code:: ipython3
+.. code:: python
 
     # Example 1: Compute multiple integrals in ONE call
     # I(a) = integral from 0 to a of x^2 dx = a^3/3
@@ -938,7 +938,7 @@ Output:
 
 The key advantage of this approach is that all integrals are computed in a single vectorized operation, which can provide significant speedups:
 
-.. code:: ipython3
+.. code:: python
 
     # Performance comparison - batch vs sequential
     import time
@@ -1023,7 +1023,7 @@ Parallel Processing with Multiple GPUs
 
 For compute-intensive workloads that can be parallelized, you can spawn multiple processes, each using a different GPU:
 
-.. code:: ipython3
+.. code:: python
 
     import multiprocessing as mp
     import os
@@ -1110,7 +1110,7 @@ Use Cases for Multi-GPU Integration
 Example: Monte Carlo Error Estimation
 ``````````````````````````````````````
 
-.. code:: ipython3
+.. code:: python
 
     import subprocess
     import textwrap
@@ -1204,7 +1204,7 @@ Custom Integrators
 
 It is of course possible to extend our provided Integrators, perhaps for a special class of functions or for a new algorithm.
 
-.. code:: ipython3
+.. code:: python
 
     import scipy
     from torchquad import Gaussian
