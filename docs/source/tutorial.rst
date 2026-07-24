@@ -611,8 +611,8 @@ Because the whole quadrature is differentiable, an integral can appear directly 
 gradients will flow back through it to a model's parameters. This lets you train a neural network on a
 quantity that is only defined as an integral.
 
-As a minimal example, we fit a small network :math:`f_\\theta` to a target function :math:`g` by
-minimizing the integrated squared error :math:`\\int_0^1 (f_\\theta(x) - g(x))^2 \\, dx`, where the
+As a minimal example, we fit a small network :math:`f_\theta` to a target function :math:`g` by
+minimizing the integrated squared error :math:`\int_0^1 (f_\theta(x) - g(x))^2 \, dx`, where the
 loss integral itself is evaluated with torchquad:
 
 .. code:: python
@@ -798,8 +798,6 @@ sample points for both functions:
 
     print(f"Quadrature results: {integral1}, {integral2}")
 
-.. _multi_dim_integrand:
-
 Passing parameters to the integrand
 -----------------------------------
 
@@ -827,20 +825,26 @@ to the integrand as ``fn(points, *args)``:
 Quasi-Monte Carlo with Sobol points
 -----------------------------------
 
-Plain Monte Carlo draws points at random, so its error shrinks only as :math:`O(1/\\sqrt{N})`.
+Plain Monte Carlo draws points at random, so its error shrinks only as :math:`O(1/\sqrt{N})`.
 For smooth integrands a low-discrepancy (quasi-random) Sobol sequence covers the domain far more
 evenly, pushing the error closer to :math:`O(1/N)`. Pass a :class:`~torchquad.Sobol` sampler as the
 ``rng`` argument of ``MonteCarlo.integrate``:
 
 .. code:: python
 
+    import torch
     from torchquad import MonteCarlo, Sobol, set_up_backend
 
     set_up_backend("torch", "float64")
+
+    # A smooth 3-D integrand: prod_i cos(pi/2 * x_i).
+    def smooth_integrand(x):
+        return torch.prod(torch.cos(x * (torch.pi / 2)), dim=1)
+
     mc = MonteCarlo()
     integration_domain = [[0.0, 1.0]] * 3
     result = mc.integrate(
-        some_smooth_integrand,
+        smooth_integrand,
         dim=3,
         N=2**13,                       # a power of two keeps the Sobol balance properties
         integration_domain=integration_domain,
@@ -849,6 +853,8 @@ evenly, pushing the error closer to :math:`O(1/N)`. Pass a :class:`~torchquad.So
 
 The sample points are constants, so gradients still flow through the integrand and the domain exactly
 as for plain Monte Carlo. Sobol points are reproducible for a fixed ``seed`` within a backend.
+
+.. _multi_dim_integrand:
 
 Multidimensional/Vectorized Integrands
 --------------------------------------
