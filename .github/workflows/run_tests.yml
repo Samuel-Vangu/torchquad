@@ -30,8 +30,10 @@ jobs:
         run: pydoclint torchquad/
 
   # Authoritative correctness job: every backend installed (CPU) across the
-  # supported Python range, so skipped tests are treated as errors. The 3.12 leg
-  # additionally enforces the coverage floor and posts the PR coverage comment.
+  # supported Python range, so skipped tests are treated as errors. Every leg
+  # enforces the coverage floor; the 3.12 leg additionally posts the PR coverage
+  # comment. The severe-error gate is not duplicated here — the parallel lint
+  # job's full `ruff check` already covers E9/F63/F7/F82.
   test:
     runs-on: ubuntu-latest
     strategy:
@@ -48,8 +50,6 @@ jobs:
         uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
-      - name: Severe error gate (ruff)
-        run: uvx ruff@0.14.6 check --select=E9,F63,F7,F82 --output-format=github .
       - name: Install torchquad and all backends (CPU)
         run: |
           uv venv --python ${{ matrix.python-version }}
@@ -110,6 +110,14 @@ jobs:
             uv pip install tensorflow
           fi
           uv pip install -e ".[dev]"
+      - name: Verify ${{ matrix.backend }} imports
+        # Without --error-for-skips here, a pinned backend that fails to import
+        # would make every one of its tests importorskip and the job pass green
+        # for exactly the failure mode this job exists to catch. Fail explicitly
+        # if the pinned release cannot even be imported.
+        run: |
+          source .venv/bin/activate
+          python -c "import ${{ matrix.backend }}"
       - name: Test ${{ matrix.backend }}
         run: |
           source .venv/bin/activate
@@ -132,6 +140,8 @@ jobs:
           uv venv --python 3.12
           source .venv/bin/activate
           uv pip install dist/*.whl
+          # NOTE: _deployment_test is slated to be renamed to deployment_test
+          # (drop the underscore); update this line in that rename PR.
           python -c "import torchquad; assert torchquad._deployment_test()"
 
   # Documentation build gate: warnings are errors so doc rot fails the PR

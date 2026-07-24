@@ -9,7 +9,10 @@ description = "Numerical integration for PyTorch, JAX, TensorFlow and NumPy."
 channels = ["conda-forge"]
 platforms = ["linux-64", "osx-64", "osx-arm64", "win-64"]
 
-# Core runtime dependencies (backend-agnostic).
+# Core runtime dependencies (backend-agnostic). These floors mirror
+# pyproject.toml's [project.dependencies] so pixi prefers conda-forge binaries;
+# keep them in sync with pyproject (bump both together) — pyproject stays the
+# single source of truth for the pip/uv install.
 [dependencies]
 python = ">=3.10"
 autoray = ">=0.5.0"
