@@ -271,7 +271,21 @@ Let's see what type of value we get for different integrators.
 Notably, Simpson's method is already sufficient for a perfect solution here with 101 points.
 Monte Carlo methods do not perform so well; they are more suited to higher-dimensional integrals.
 VEGAS currently requires a larger number of samples to function correctly (as it performs several
-iterations).
+iterations). As a rule of thumb, give VEGAS at least a few thousand points (``N``); it splits the
+budget across warmup and roughly ``max_iterations`` refinement iterations, so a too-small ``N``
+leaves each iteration with too few samples to adapt. If VEGAS returns a poor estimate, increasing
+``N`` is usually the first thing to try.
+
+VEGAS also estimates its own error. Pass ``return_error=True`` to get a ``VEGASResult`` bundling the
+integral with its standard deviation, chi-squared, degrees of freedom and goodness-of-fit ``Q``
+(a ``Q`` close to 1 means the per-iteration estimates are consistent):
+
+.. code:: python
+
+    vegas = VEGAS()
+    result = vegas.integrate(f, dim=1, N=10000, integration_domain=integration_domain, return_error=True)
+    print(result)                       # VEGASResult(..., chi2/dof = ..., Q = ...)
+    print(result.integral, result.sdev)
 
 Let's step things up now and move to a ten-dimensional problem.
 
@@ -590,6 +604,54 @@ The output of the print statements is as follows:
     Gradient result for Trapezoid: tensor([[-2.0000,  2.0000]])
 
 
+Training a neural network through an integral
+---------------------------------------------
+
+Because the whole quadrature is differentiable, an integral can appear directly in a loss function and
+gradients will flow back through it to a model's parameters. This lets you train a neural network on a
+quantity that is only defined as an integral.
+
+As a minimal example, we fit a small network :math:`f_\theta` to a target function :math:`g` by
+minimizing the integrated squared error :math:`\int_0^1 (f_\theta(x) - g(x))^2 \, dx`, where the
+loss integral itself is evaluated with torchquad:
+
+.. code:: python
+
+    import torch
+    from torchquad import Trapezoid, set_up_backend
+
+    set_up_backend("torch", "float64")
+    integrator = Trapezoid()
+    integration_domain = [[0.0, 1.0]]
+
+    # Target function the network should learn.
+    def target(x):
+        return torch.sin(2 * torch.pi * x[:, 0])
+
+    model = torch.nn.Sequential(
+        torch.nn.Linear(1, 32), torch.nn.Tanh(), torch.nn.Linear(32, 1)
+    ).double()
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-2)
+
+    # The loss is the integrated squared error, computed differentiably.
+    def squared_error(x):
+        prediction = model(x[:, :1]).squeeze(-1)
+        return (prediction - target(x)) ** 2
+
+    for step in range(300):
+        optimizer.zero_grad()
+        loss = integrator.integrate(
+            squared_error, dim=1, N=201, integration_domain=integration_domain
+        )
+        loss.backward()          # gradients flow through the integral into the network
+        optimizer.step()
+
+    print(f"Final integrated L2 error: {loss.item():.4f}")
+
+Calling ``loss.backward()`` differentiates through every integrand evaluation, so ``model``'s weights
+are updated to reduce the integral. The same pattern extends to physics-style losses (for example
+fitting a potential to its integrated field) and to higher dimensions with ``MonteCarlo`` or ``VEGAS``.
+
 Speedups for repeated quadrature
 --------------------------------
 
@@ -735,6 +797,62 @@ sample points for both functions:
     integral2 = integrator.calculate_result(function_values, dim, n_per_dim, hs, integration_domain)
 
     print(f"Quadrature results: {integral1}, {integral2}")
+
+Passing parameters to the integrand
+-----------------------------------
+
+Integrands often depend on extra parameters besides the integration variable. Rather than closing
+over them in a ``lambda``, pass them through the ``args`` argument, which every integrator forwards
+to the integrand as ``fn(points, *args)``:
+
+.. code:: python
+
+    from torchquad import Simpson
+
+    def parametrized_integrand(x, a, b):
+        return a * x[:, 0] + b
+
+    simpson = Simpson()
+    integration_domain = [[0.0, 1.0]]
+    result = simpson.integrate(
+        parametrized_integrand, dim=1, N=101, integration_domain=integration_domain, args=(3.0, 2.0)
+    )
+    # equivalent to integrating lambda x: parametrized_integrand(x, 3.0, 2.0)
+
+``args`` works with every integrator (``Trapezoid``, ``Simpson``, ``Boole``, ``GaussLegendre``,
+``MonteCarlo`` and ``VEGAS``) and defaults to ``None`` (no extra arguments).
+
+Quasi-Monte Carlo with Sobol points
+-----------------------------------
+
+Plain Monte Carlo draws points at random, so its error shrinks only as :math:`O(1/\sqrt{N})`.
+For smooth integrands a low-discrepancy (quasi-random) Sobol sequence covers the domain far more
+evenly, pushing the error closer to :math:`O(1/N)`. Pass a :class:`~torchquad.Sobol` sampler as the
+``rng`` argument of ``MonteCarlo.integrate``:
+
+.. code:: python
+
+    import torch
+    from torchquad import MonteCarlo, Sobol, set_up_backend
+
+    set_up_backend("torch", "float64")
+
+    # A smooth 3-D integrand: prod_i cos(pi/2 * x_i).
+    def smooth_integrand(x):
+        return torch.prod(torch.cos(x * (torch.pi / 2)), dim=1)
+
+    mc = MonteCarlo()
+    integration_domain = [[0.0, 1.0]] * 3
+    result = mc.integrate(
+        smooth_integrand,
+        dim=3,
+        N=2**13,                       # a power of two keeps the Sobol balance properties
+        integration_domain=integration_domain,
+        rng=Sobol(backend="torch", seed=0),
+    )
+
+The sample points are constants, so gradients still flow through the integrand and the domain exactly
+as for plain Monte Carlo. Sobol points are reproducible for a fixed ``seed`` within a backend.
 
 .. _multi_dim_integrand:
 
