@@ -11,6 +11,9 @@ The 0.6 line is a modernization and credibility release: modern tooling, honest
 packaging, and closing long-open fixed issues.
 
 ### Added
+- `VEGAS.integrate(..., return_error=True)` returns a `VEGASResult` bundling the
+  integral with its error estimate (standard deviation, chi-squared, degrees of
+  freedom and goodness-of-fit Q) instead of discarding them.
 - Optional-dependency extras: `dev`, `docs`, and CPU-convenience backend extras
   `torch`, `jax`, `tensorflow`, `all`.
 - `release_testing/` suite — slower end-to-end checks run against the latest
