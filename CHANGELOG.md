@@ -11,6 +11,9 @@ The 0.6 line is a modernization and credibility release: modern tooling, honest
 packaging, and closing long-open fixed issues.
 
 ### Added
+- `Sobol` quasi-Monte Carlo sampler, usable via
+  `MonteCarlo.integrate(..., rng=Sobol(...))` for faster convergence on smooth
+  integrands (#140).
 - `VEGAS.integrate(..., return_error=True)` returns a `VEGASResult` bundling the
   integral with its error estimate (standard deviation, chi-squared, degrees of
   freedom and goodness-of-fit Q) instead of discarding them.
