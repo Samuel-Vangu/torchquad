@@ -107,6 +107,9 @@ class VEGAS(BaseIntegrator):
         domain_starts = integration_domain[:, 0]
         domain_sizes = integration_domain[:, 1] - domain_starts
         domain_volume = anp.prod(domain_sizes)
+        # VEGAS bakes the integrand into a closure and evaluates it via _eval
+        # rather than passing args through evaluate_integrand, so it repeats the
+        # None -> () normalization here. Keep the two in sync if either changes.
         extra_args = () if args is None else args
 
         def transformed_integrand(x):
