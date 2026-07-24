@@ -52,9 +52,14 @@ def _vegas_result_fields_test(backend, dtype_name=None):
         f"Error estimate {sdev} does not bracket the true error {abs(integral - _EXPECTED)}"
     )
 
-    # Degrees of freedom and goodness-of-fit are well-formed.
+    # Degrees of freedom and goodness-of-fit are well-formed, and Q matches an
+    # independent evaluation of the chi-squared survival function (guards against
+    # a swapped-argument or wrong-formula regression, not just a plausible range).
+    from scipy.special import gammaincc
+
     assert result.dof >= 1
     assert result.Q is not None and 0.0 <= result.Q <= 1.0
+    assert abs(result.Q - float(gammaincc(result.dof / 2.0, chi2 / 2.0))) < 1e-12
     assert result.nr_of_fevals > 0
     # __repr__ must not raise.
     assert "VEGASResult" in repr(result)

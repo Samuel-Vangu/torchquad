@@ -371,11 +371,14 @@ class VEGAS(BaseIntegrator):
             backend-specific float: Chi squared.
         """
         I_final = self._get_result()
+        # Skip zero-variance iterations (as _get_result and _get_error do): a
+        # zero divisor would make chi-squared inf, which return_error now exposes
+        # to users as chi2/Q.
         return sum(
             (
                 (res - I_final) ** 2 / sig2
                 for res, sig2 in zip(self.results, self.sigma2)
-                if res != I_final
+                if res != I_final and sig2 != 0.0
             ),
             start=self.results[0] * 0.0,
         )

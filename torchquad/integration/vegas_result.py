@@ -32,8 +32,10 @@ class VEGASResult:
     """A VEGAS integration result bundled with its error estimate.
 
     Returned by :meth:`VEGAS.integrate` when ``return_error=True``. The
-    tensor-valued fields keep the numerical backend of the integration so they
-    remain differentiable.
+    tensor-valued fields keep the numerical backend of the integration. Only
+    ``integral`` is on the gradient path; ``sdev`` and ``chi2`` are derived from
+    the per-iteration variances, which VEGAS detaches, so they are not
+    differentiable.
     """
 
     integral: Any
