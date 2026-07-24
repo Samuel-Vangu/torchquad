@@ -10,6 +10,9 @@ jobs:
     permissions:
       # OIDC token for PyPI trusted publishing — no stored API token needed.
       id-token: write
+      # Declaring any permission drops the rest to none, so restore read access
+      # for checkout (don't rely on the repo staying public).
+      contents: read
 
     steps:
       - uses: actions/checkout@v4
@@ -18,4 +21,6 @@ jobs:
       - name: Build sdist and wheel
         run: uv build
       - name: Publish to PyPI
+        # release/v1 is PyPA's intentionally auto-tracking major ref; Dependabot
+        # cannot bump a branch ref, so this action is updated by PyPA, not us.
         uses: pypa/gh-action-pypi-publish@release/v1
