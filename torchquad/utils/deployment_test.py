@@ -29,9 +29,6 @@ def _deployment_test():
 
     # Suppress common warnings to reduce noise
     warnings.filterwarnings("ignore", message="torch.meshgrid: in an upcoming release")
-    warnings.filterwarnings(
-        "ignore", message="DEPRECATION WARNING: In future versions of torchquad"
-    )
 
     logger.info("####################################")
     logger.info("######## TESTING DEPLOYMENT ########")

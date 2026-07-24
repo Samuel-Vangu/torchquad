@@ -1,6 +1,13 @@
 import os
 
+from loguru import logger
+
 __version__ = "0.5.0"
+
+# Disable torchquad's own log records by default so importing the library never
+# adds output to a host application's loguru configuration (issue #184).
+# set_log_level() re-enables them when the user opts into logging.
+logger.disable("torchquad")
 
 # Set for release builds
 TORCHQUAD_DISABLE_LOGGING = True
@@ -48,7 +55,5 @@ __all__ = [
 ]
 
 if not TORCHQUAD_DISABLE_LOGGING:
-    from loguru import logger
-
     set_log_level(os.environ.get("TORCHQUAD_LOG_LEVEL", "WARNING"))
     logger.info("Initializing torchquad.")
