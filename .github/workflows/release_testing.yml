@@ -34,9 +34,11 @@ jobs:
           pip install torch --index-url https://download.pytorch.org/whl/cpu
           pip install "jax[cpu]" tensorflow
           pip install -e .
-          pip install pytest
+          pip install pytest pytest-error-for-skips
       - name: Report resolved backend versions
         run: pip list | grep -iE "^(torch|jax|jaxlib|tensorflow|numpy|autoray|scipy) "
       - name: Run release test suite
-        # No `| tee` here, so pytest's exit code fails the job directly.
-        run: pytest release_testing/ -v -ra --durations=15
+        # No `| tee`, so pytest's exit code fails the job directly. --error-for-skips
+        # turns a missing/broken backend into a failure instead of a silent skip,
+        # which is the whole point of running against the latest releases.
+        run: pytest release_testing/ -v -ra --error-for-skips --durations=15

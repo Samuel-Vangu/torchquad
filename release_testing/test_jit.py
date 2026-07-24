@@ -1,45 +1,44 @@
 """JIT-compiled repeated quadrature matches the eager path.
 
 Users who evaluate the same integrator over many domains use
-``get_jit_compiled_integrate`` (JAX/TF ``jit``, torch). The compiled result must
-match the eager call numerically for the same seed.
+``get_jit_compiled_integrate`` (JAX/TF ``jit``, torch). A deterministic rule has
+no RNG, so the compiled path must reproduce the eager path essentially
+bit-for-bit — real parity, not just "both are roughly right".
 """
 
 import math
 
+import autoray as ar
 import pytest
+from autoray import numpy as anp
 
-from torchquad import MonteCarlo, set_up_backend
-from torchquad.integration.utils import _setup_integration_domain
+from torchquad import Simpson, set_up_backend
 
 import _integrands as ig
 from conftest import rel_error
 
 
 @pytest.mark.parametrize("backend", ["torch", "jax", "tensorflow"])
-def test_jit_matches_eager_monte_carlo(backend):
-    """JIT-compiled MC integrate reproduces the eager integrate (same seed)."""
+def test_jit_matches_eager_simpson(backend):
+    """JIT-compiled Simpson reproduces the eager result and the analytic value."""
     pytest.importorskip(backend)
     set_up_backend(backend, data_type="float64")
-    mc = MonteCarlo()
-    # The compiled integrate takes a backend *tensor* domain, so build one and
-    # use it for both paths to compare like with like.
-    domain = _setup_integration_domain(1, [[0.0, 2.0]], backend)
-    n_points = 100_000
+    simpson = Simpson()
+    # Build the domain via autoray's public API (the compiled path takes a
+    # backend tensor, not a Python list).
+    dtype = ar.to_backend_dtype("float64", like=backend)
+    domain = anp.array([[0.0, 2.0]], like=backend, dtype=dtype)
+    n_points = 10001
 
-    eager = mc.integrate(
-        ig.sin_1d, dim=1, N=n_points, integration_domain=domain, seed=0, backend=backend
+    eager = simpson.integrate(
+        ig.sin_1d, dim=1, N=n_points, integration_domain=domain, backend=backend
     )
-    jit_integrate = mc.get_jit_compiled_integrate(
-        dim=1, N=n_points, integration_domain=domain, seed=0, backend=backend
+    jit_integrate = simpson.get_jit_compiled_integrate(
+        dim=1, N=n_points, integration_domain=domain, backend=backend
     )
     compiled = jit_integrate(ig.sin_1d, domain)
 
-    # The JIT path seeds its own RNG stream, so compiled and eager are
-    # independent draws, not bit-identical. Both must still land on the analytic
-    # value within Monte Carlo tolerance — that is what validates the JIT path.
     expected = 1.0 - math.cos(2.0)  # int_0^2 sin(x) dx
-    eager_error = rel_error(eager, expected)
-    compiled_error = rel_error(compiled, expected)
-    assert eager_error < 5e-2, f"eager MC too far from truth ({backend}): {eager_error:.2e}"
-    assert compiled_error < 5e-2, f"JIT MC too far from truth ({backend}): {compiled_error:.2e}"
+    # Deterministic rule -> compiled and eager must agree to ~float64 rounding.
+    assert rel_error(compiled, float(eager)) < 1e-10, f"JIT and eager Simpson disagree ({backend})"
+    assert rel_error(compiled, expected) < 1e-8, f"JIT Simpson wrong ({backend})"

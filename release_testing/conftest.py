@@ -14,6 +14,10 @@ from torchquad import set_up_backend
 # JIT path excludes numpy; those tests narrow the set themselves.
 ALL_BACKENDS = ["numpy", "torch", "jax", "tensorflow"]
 
+# Below this magnitude an "expected" value is treated as zero and rel_error
+# falls back to absolute error (e.g. odd-integrand cancellation checks).
+_ZERO_DENOM_ATOL = 1e-12
+
 
 @pytest.fixture(params=ALL_BACKENDS)
 def backend_f64(request):
@@ -50,6 +54,6 @@ def rel_error(result, expected):
     dtype = np.complex128 if is_complex else np.float64
     result = np.asarray(to_numpy(result), dtype=dtype).reshape(())
     denom = abs(expected)
-    if denom < 1e-12:
+    if denom < _ZERO_DENOM_ATOL:
         return float(abs(result - expected))
     return float(abs(result - expected) / denom)

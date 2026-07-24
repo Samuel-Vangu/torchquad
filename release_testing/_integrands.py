@@ -14,7 +14,6 @@ cosmology), peaked/tailed kernels, and complex-valued Fourier transforms
 import math
 
 from autoray import numpy as anp
-from scipy.special import erf
 
 # --- 1D smooth, deterministic-rule anchors -------------------------------------
 
@@ -42,7 +41,7 @@ NORMAL_PDF = (
     "normal pdf on [-8,8]",
     normal_pdf_1d,
     [[-8.0, 8.0]],
-    float(erf(8.0 / math.sqrt(2.0))),
+    math.erf(8.0 / math.sqrt(2.0)),
 )
 
 SMOOTH_1D = [SIN_ON_0_HALFPI, SIN_ON_0_5, LORENTZIAN, NORMAL_PDF]
