@@ -7,7 +7,7 @@ name = "torchquad"
 version = "0.5.0"
 description = "Package providing numerical integration methods for PyTorch, jax, TensorFlow and numpy."
 readme = { file = "README.md", content-type = "text/markdown" }
-requires-python = ">=3.8, <4"
+requires-python = ">=3.10, <4"
 license = { text = "GPL-3.0" }
 authors = [
     { name = "ESA Advanced Concepts Team", email = "pablo.gomez@esa.int" },
@@ -18,7 +18,9 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "Topic :: Scientific/Engineering :: Mathematics",
     "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
-    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
     "loguru>=0.5.3",

@@ -21,7 +21,7 @@ torchquad's GPU support is tested only on NVIDIA cards with CUDA. We are investi
 For a detailed list of required packages and packages for numerical backends,
 please refer to the conda environment files `environment.yml <https://github.com/esa/torchquad/blob/main/environment.yml>`_ and
 `environment_all_backends.yml <https://github.com/esa/torchquad/blob/main/environment_all_backends.yml>`_.
-torchquad has been tested with JAX 0.2.25, NumPy 1.19.5, PyTorch 1.10.0 and Tensorflow 2.7.0; other versions of the backends should work as well.
+torchquad requires Python 3.10 or newer and has been tested with JAX 0.4.17, NumPy 1.19.5, PyTorch 2.1 and TensorFlow 2.18; other versions of the backends should work as well.
 
 
 Installation
@@ -44,7 +44,7 @@ The PyTorch backend with CUDA support can be installed with
 
    .. code-block:: bash
 
-      conda install "cudatoolkit>=11.1" "pytorch>=1.9=*cuda*" -c conda-forge -c pytorch
+      conda install "cudatoolkit>=11.1" "pytorch>=2.1=*cuda*" -c conda-forge -c pytorch
 
 Note that since PyTorch is not yet on *conda-forge* for Windows, we have
 explicitly included it here using ``-c pytorch``.
