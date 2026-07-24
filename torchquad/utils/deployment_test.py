@@ -1,18 +1,22 @@
-from torchquad import Boole, Trapezoid, Simpson, VEGAS, MonteCarlo
+# Import from submodules rather than the top-level package: this module is
+# imported during torchquad's own __init__, so `from torchquad import ...` would
+# re-enter a partially-initialized package (a circular import that only happened
+# to work because of import ordering).
+from ..integration.boole import Boole
+from ..integration.trapezoid import Trapezoid
+from ..integration.simpson import Simpson
+from ..integration.vegas import VEGAS
+from ..integration.monte_carlo import MonteCarlo
 
-# TODO test these in the future
-# from ..plots.plot_convergence import plot_convergence
-# from ..plots.plot_runtime import plot_runtime
-
-from torchquad import enable_cuda
-from torchquad import set_precision
-from torchquad import set_log_level
-from torchquad import set_up_backend
+from .enable_cuda import enable_cuda
+from .set_precision import set_precision
+from .set_log_level import set_log_level
+from .set_up_backend import set_up_backend
 from loguru import logger
 import warnings
 
 
-def _deployment_test():
+def deployment_test():
     """Comprehensive test to verify successful deployment of torchquad.
 
     This method is used internally to check successful deployment after PyPI releases.
@@ -252,6 +256,24 @@ def _deployment_test():
     else:
         logger.info("✓ Deployment test completed successfully!")
         return True
+
+
+def _deployment_test():
+    """Deprecated alias for :func:`deployment_test`.
+
+    The public name gained a leading underscore by mistake; it is kept working
+    for one release and will be removed in 0.7.
+
+    Returns:
+        bool: Whatever :func:`deployment_test` returns.
+    """
+    warnings.warn(
+        "_deployment_test is deprecated and will be removed in 0.7; "
+        "use torchquad.deployment_test instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return deployment_test()
 
 
 def _get_exp_func(x):

@@ -151,7 +151,7 @@ users can test `torchquad`'s correct installation with:
 
 ```py
 import torchquad
-torchquad._deployment_test()
+torchquad.deployment_test()
 ```
 
 After cloning the repository, developers can check the functionality of `torchquad` by running
