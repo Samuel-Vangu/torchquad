@@ -135,7 +135,6 @@ my_notebooks
 .vscode
 pytest-coverage.txt
 pytest.xml
-CLAUDE.md
 CLAUDE.local.md
 .claude/
 
