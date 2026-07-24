@@ -20,6 +20,7 @@ from .integration.trapezoid import Trapezoid
 from .integration.simpson import Simpson
 from .integration.boole import Boole
 from .integration.vegas import VEGAS
+from .integration.vegas_result import VEGASResult
 from .integration.gaussian import GaussLegendre
 from .integration.gaussian import Gaussian
 from .integration.grid_integrator import GridIntegrator
@@ -51,6 +52,7 @@ __all__ = [
     "Simpson",
     "Boole",
     "VEGAS",
+    "VEGASResult",
     "GaussLegendre",
     "Gaussian",
     "RNG",
