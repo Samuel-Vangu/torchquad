@@ -22,6 +22,7 @@ _to be written during release process_
 - [ ] Review the PR (if OK - merge, but DO NOT delete the branch)
 - [ ] On `Release` ,Minimize packages in requirements.txt and conda-forge submission. Update packages in pyproject.toml
 - [ ] Check unit tests -> Check all tests pass on CPU and [GPU (e.g. on colab)](https://colab.research.google.com/drive/1lFpdtY5zV7VpW88aazedA3n4khedHDQP?usp=sharing#scrollTo=IbU2vypPQ-Ej) and that there are tests for all important features
+- [ ] Run the extended **release-testing suite** against the latest framework versions: trigger the [Release testing GitHub Action](https://github.com/esa/torchquad/actions/workflows/release_testing.yml) on the release branch (or run `pytest release_testing/` locally in an env with the newest torch/JAX/TensorFlow) and confirm all checks pass. See [`release_testing/README.md`](https://github.com/esa/torchquad/blob/main/release_testing/README.md).
 - [ ] Check documentation -> Check presence of documentation for all features by locally building the docs on the release
 - [ ] Change version number in pyproject.toml and docs (under conf.py) and in `__init__.py`
 - [ ] In `__init__.py`, set `TORCHQUAD_DISABLE_LOGGING` to `True`
