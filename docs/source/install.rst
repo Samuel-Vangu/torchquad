@@ -44,15 +44,18 @@ It is also available on conda-forge:
 
       conda install torchquad -c conda-forge
 
-**Adding a backend (CPU).** *torchquad* ships convenience extras that pull in the
-CPU build of a backend from the default package index:
+**Adding a backend.** *torchquad* ships convenience extras that pull a backend
+from the default package index. ``jax`` and ``tensorflow`` install CPU builds;
+``torch`` resolves to the CUDA build on Linux (that is what PyTorch publishes to
+PyPI), and CPU on macOS/Windows. For a guaranteed-CPU torch, install it from the
+PyTorch CPU index first.
 
    .. code-block:: bash
 
-      pip install "torchquad[torch]"        # PyTorch (CPU)
+      pip install "torchquad[torch]"        # PyTorch (CUDA on Linux, CPU elsewhere)
       pip install "torchquad[jax]"          # JAX (CPU)
       pip install "torchquad[tensorflow]"   # TensorFlow (CPU)
-      pip install "torchquad[all]"          # all three (CPU)
+      pip install "torchquad[all]"          # all three
 
 **Adding a backend (GPU).** These extras cannot select GPU wheels (a Python
 package cannot encode the CUDA-specific index URLs each framework needs), so for

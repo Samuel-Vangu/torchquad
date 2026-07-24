@@ -30,14 +30,17 @@ dependencies = [
     "autoray>=0.5.0",
 ]
 
-# PEP 508 cannot encode per-index URLs, so the backend extras below install only
-# the default-index CPU builds. For GPU/accelerator builds, follow each
-# framework's own install guide (they need CUDA/ROCm-specific wheels and index
-# URLs that a plain extra cannot express). JAX and TensorFlow GPU wheels are
-# Linux/WSL2-only.
+# PEP 508 cannot encode per-index URLs, so the backend extras below install
+# from the default package index. `jax[cpu]` and `tensorflow` are CPU builds;
+# `torch`, however, is CPU on macOS/Windows but the CUDA build on Linux (that is
+# how PyTorch publishes to PyPI). For a guaranteed-CPU torch, or for any GPU
+# build, follow each framework's own install guide (they need CUDA/ROCm-specific
+# wheels and index URLs a plain extra cannot express). JAX and TensorFlow GPU
+# wheels are Linux/WSL2-only.
 [project.optional-dependencies]
-# Development toolchain — mirrors the CI lint + test gates. Version floors track
-# the pins used in the CI workflows; bump both together.
+# Development toolchain for the CI lint + test gates. ruff, pydoclint, vulture,
+# and pytest floors match the versions pinned in the CI workflows; the rest are
+# reasonable minimums, not lockstep pins.
 dev = [
     "pytest>=6.2.1",
     "pytest-cov>=4.0.0",
@@ -53,15 +56,16 @@ docs = [
     "sphinx>=3.4.3",
     "sphinx_rtd_theme>=0.5.1",
 ]
-# CPU/default-index backend conveniences. For GPU support, install the framework
-# from its own guide instead of using these extras.
+# Default-index backend conveniences (see the note above: torch is CUDA on
+# Linux). For a guaranteed CPU torch or any GPU build, use the framework's guide.
 torch = ["torch>=2.1"]
 jax = ["jax[cpu]>=0.4.17"]
 tensorflow = ["tensorflow>=2.18.0"]
+# Recursive extras keep the backend floors defined in exactly one place each.
 all = [
-    "torch>=2.1",
-    "jax[cpu]>=0.4.17",
-    "tensorflow>=2.18.0",
+    "torchquad[torch]",
+    "torchquad[jax]",
+    "torchquad[tensorflow]",
 ]
 
 [project.urls]
