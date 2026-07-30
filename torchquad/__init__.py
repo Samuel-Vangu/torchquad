@@ -28,6 +28,7 @@ from .integration.base_integrator import BaseIntegrator
 
 from .integration.rng import RNG
 from .integration.qmc import Sobol
+from .integration.qmc import Lattice
 
 
 from .utils.set_log_level import set_log_level
@@ -57,6 +58,7 @@ __all__ = [
     "Gaussian",
     "RNG",
     "Sobol",
+    "Lattice",
     "enable_cuda",
     "set_precision",
     "set_log_level",
