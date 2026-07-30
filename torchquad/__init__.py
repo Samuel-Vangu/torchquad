@@ -27,6 +27,7 @@ from .integration.grid_integrator import GridIntegrator
 from .integration.base_integrator import BaseIntegrator
 
 from .integration.rng import RNG
+from .integration.qmc import Halton
 from .integration.qmc import Sobol
 
 
@@ -56,6 +57,7 @@ __all__ = [
     "GaussLegendre",
     "Gaussian",
     "RNG",
+    "Halton",
     "Sobol",
     "enable_cuda",
     "set_precision",
