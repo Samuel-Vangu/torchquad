@@ -98,6 +98,7 @@ from pathlib import Path
 
 DATA_DIR = Path(__file__).resolve().parent
 
+
 def load_lattice_vector(d, filename="lattice-33002-1024-1048576.9125"):
     """
     Load the first d components of the generating vector z
@@ -131,7 +132,9 @@ def load_lattice_vector(d, filename="lattice-33002-1024-1048576.9125"):
     max_d = data.shape[0]
 
     if d > max_d:
-        raise ValueError(f"Requested dimension d={d}, but the file contains only {max_d} components.")
+        raise ValueError(
+            f"Requested dimension d={d}, but the file contains only {max_d} components."
+        )
 
     z = data[:d, 1]
 
@@ -142,15 +145,14 @@ import torch
 import numbers
 import warnings
 
+
 def _check_positive_whole_number(value, name):
     """Accept any real number equal to a whole number (2, 2.0, np.float64(2.0), ...),
     reject bool (a subtype of int in Python) and anything non-integral (2.5)."""
     if isinstance(value, bool):
         raise TypeError(f"{name} must be a number, but got a bool.")
     if not isinstance(value, (numbers.Real, np.floating, np.integer)):
-        raise TypeError(
-            f"{name} must be a real number, but got {type(value).__name__}."
-        )
+        raise TypeError(f"{name} must be a real number, but got {type(value).__name__}.")
     if float(value) != int(value):
         raise ValueError(f"{name} must be a whole number, but got {value}.")
     return int(value)
@@ -258,9 +260,7 @@ class Lattice:
             )
 
         if not 1 <= dim <= 9125:
-            raise ValueError(
-                f"The dimension must be between 1 and 9125, but got {dim}."
-            )
+            raise ValueError(f"The dimension must be between 1 and 9125, but got {dim}.")
 
         if number_of_points & (number_of_points - 1) != 0:
             warnings.warn(
@@ -299,12 +299,9 @@ class Lattice:
                 gen.manual_seed(self._seed)
             else:
                 gen.seed()  # a fresh torch.Generator() otherwise keeps a fixed internal
-                            # default seed, which would make every unseeded shift
-                            # identical instead of independently random
+                # default seed, which would make every unseeded shift
+                # identical instead of independently random
             shift_values = torch.rand(dim, generator=gen, device=device)
             points = torch.remainder(points + shift_values.to(dtype), 1)
 
         return points.to(dtype)
-
-
-

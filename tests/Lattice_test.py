@@ -244,9 +244,7 @@ def test_lattice_seed_ignored_when_shift_false():
     points_a = Lattice(seed=1, shift=False).uniform([n, dim], torch.float64)
     points_b = Lattice(seed=99, shift=False).uniform([n, dim], torch.float64)
 
-    assert torch.equal(points_a, points_b), (
-        "Unshifted lattice points must not depend on the seed"
-    )
+    assert torch.equal(points_a, points_b), "Unshifted lattice points must not depend on the seed"
 
 
 def test_lattice_points_lie_in_unit_cube():
