@@ -91,3 +91,138 @@ class Sobol:
         sampler = qmc.Sobol(d=dim, scramble=self._scramble, seed=self._seed)
         points = sampler.random(number_of_points)
         return anp.array(points, dtype=dtype, like=self._backend)
+
+import numbers
+
+import numpy as np
+
+
+def _check_positive_whole_number(value, name):
+    """Accept any strictly positive real number equal to a whole number
+    (2, 2.0, np.float64(2.0), ...); reject bool (a bool is technically an
+    int subtype in Python) and anything non-integral (2.5) or non-positive."""
+    if isinstance(value, bool):
+        raise TypeError(f"{name} must be a number, but got a bool.")
+    if not isinstance(value, (numbers.Real, np.floating, np.integer)):
+        raise TypeError(
+            f"{name} must be a real number, but got {type(value).__name__}."
+        )
+    if float(value) != int(value):
+        raise ValueError(f"{name} must be a whole number, but got {value}.")
+    if int(value) <= 0:
+        raise ValueError(f"{name} must be strictly positive, but got {value}.")
+    return int(value)
+
+
+class RandomizedLatinHypercube:
+    """A randomized Latin Hypercube (LHS) sampler, shaped like :class:`RNG`
+    and :class:`Sobol`.
+
+    Pass an instance as the ``rng`` argument of :meth:`MonteCarlo.integrate` to
+    turn plain Monte Carlo into a variance-reduced sampler: Latin Hypercube
+    points stratify every one-dimensional marginal exactly (one point in each
+    of the ``n`` equal-width strata along any single coordinate axis), which
+    provably reduces variance for integrands with a strong additive component,
+    at no asymptotic cost relative to plain Monte Carlo otherwise.
+
+    Like :class:`RNG` and :class:`Sobol`, an instance exposes
+    ``uniform(size, dtype)`` returning points in ``[0, 1)`` as a backend
+    tensor, so it is a drop-in replacement for the sampler ``MonteCarlo`` uses
+    internally.
+
+    For a given dimension, points are constructed as
+    ``x_i = (perm(i) - U_i) / n``, where ``perm`` is an independent random
+    permutation of ``1, ..., n`` and ``U_i`` are i.i.d. ``Uniform(0, 1)``,
+    independently for every dimension. Points are generated directly on the
+    requested backend/device in pure PyTorch for the ``torch`` backend, and
+    with ``scipy.stats.qmc.LatinHypercube`` for the others (converted to the
+    requested backend). As with plain Monte Carlo the sample points are
+    constants, so gradients still flow through the integrand and the
+    integration domain; only the point *placement* differs.
+
+    Notes:
+        - Unlike the low-discrepancy sequences in this module (Sobol, Halton),
+          there is no notion of extensibility or balance properties tied to a
+          particular sample size: any strictly positive ``n`` is valid.
+        - Per-backend implementations use independent random streams following
+          the *same* mathematical construction described above, so results
+          are reproducible for a fixed ``seed`` within a backend but do not
+          match bit-for-bit across backends -- the same tradeoff documented
+          for :class:`Sobol` and :class:`Halton`.
+        - This sampler targets the eager :meth:`MonteCarlo.integrate` path,
+          not the JIT-compiled one (which builds its own RNG internally).
+
+    **References:**
+
+    1. M. D. McKay, R. J. Beckman, and W. J. Conover. A Comparison of Three
+       Methods for Selecting Values of Input Variables in the Analysis of
+       Output from a Computer Code. Technometrics, 21(2):239-245, 1979.
+    2. M. Stein. Large Sample Properties of Simulations Using Latin Hypercube
+       Sampling. Technometrics, 29(2):143-151, 1987.
+    """
+
+    def __init__(self, backend, seed=None):
+        """Initialize a randomized Latin Hypercube sampler.
+
+        Args:
+            backend (string): Numerical backend, e.g. "torch". Must match the
+                backend of the integration domain it will be used with.
+            seed (int or None, optional): Seed for the random permutations and
+                jitter. If None, sampling is randomised. Defaults to None.
+        """
+        self._backend = backend
+        self._seed = seed
+
+    def uniform(self, size, dtype):
+        """Draw randomized LHS points in ``[0, 1)``.
+
+        Args:
+            size (list): Two-element ``[number_of_points, dim]`` shape. Each
+                element may be any strictly positive whole number (e.g. ``4``
+                or ``4.0``); it is converted to ``int``.
+            dtype (backend dtype): Floating point dtype of the returned tensor.
+
+        Returns:
+            backend tensor: ``[number_of_points, dim]`` randomized LHS points
+            in ``[0, 1)``.
+
+        Raises:
+            TypeError: If the number of points or the dimension is not a
+                real number.
+            ValueError: If either is not a strictly positive whole number.
+        """
+        number_of_points = _check_positive_whole_number(size[0], "The number of points")
+        dim = _check_positive_whole_number(size[1], "The dimension")
+        n = number_of_points
+
+        if self._backend == "torch":
+            # Native torch construction (same argsort trick as the NumPy/QMCPy
+            # version): runs directly on the current device, no NumPy/SciPy
+            # round-trip needed, unlike SobolEngine.
+            import torch
+
+            device = torch.empty(0).device
+            generator = torch.Generator(device=device)
+            if self._seed is not None:
+                generator.manual_seed(int(self._seed))
+            else:
+                # A fresh torch.Generator() otherwise keeps a fixed internal
+                # default seed (verified: two unseeded generators produce the
+                # SAME sequence), which would make every seed=None call
+                # identical instead of independently random.
+                generator.seed()
+
+            keys = torch.rand((dim, n), generator=generator, device=device, dtype=dtype)
+            permutations = torch.argsort(keys, dim=-1) + 1
+            U = torch.rand((dim, n), generator=generator, device=device, dtype=dtype)
+            result = (permutations.to(dtype) - U) / n
+            return result.transpose(0, 1)  # -> (n, dim)
+
+        # numpy / jax / tensorflow: generate with SciPy (a hard dependency) and
+        # move the points onto the requested backend. `seed=` (rather than the
+        # newer `rng=`) is used for compatibility with older SciPy versions.
+        from scipy.stats import qmc
+
+        sampler = qmc.LatinHypercube(d=dim, scramble=True, seed=self._seed)
+        points = sampler.random(number_of_points)
+        return anp.array(points, dtype=dtype, like=self._backend)
