@@ -206,9 +206,7 @@ def test_lhs_exact_stratification():
     onto {0, ..., n-1}.
     """
     n, dim = 5000, 4
-    points = RandomizedLatinHypercube(backend="torch", seed=7).uniform(
-        [n, dim], torch.float64
-    )
+    points = RandomizedLatinHypercube(backend="torch", seed=7).uniform([n, dim], torch.float64)
     for j in range(dim):
         strata = torch.floor(points[:, j] * n).long()
         assert sorted(strata.tolist()) == list(range(n)), (
@@ -285,9 +283,7 @@ def test_lhs_points_in_unit_cube():
 def test_lhs_size_accepts_whole_valued_floats():
     """`size` entries need not be `int`: any strictly positive whole number
     (e.g. `4.0`) must be accepted and converted."""
-    points = RandomizedLatinHypercube(backend="torch", seed=0).uniform(
-        [4.0, 2.0], torch.float64
-    )
+    points = RandomizedLatinHypercube(backend="torch", seed=0).uniform([4.0, 2.0], torch.float64)
     assert points.shape == (4, 2)
 
 

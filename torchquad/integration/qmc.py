@@ -92,6 +92,7 @@ class Sobol:
         points = sampler.random(number_of_points)
         return anp.array(points, dtype=dtype, like=self._backend)
 
+
 import numbers
 
 import numpy as np
@@ -104,9 +105,7 @@ def _check_positive_whole_number(value, name):
     if isinstance(value, bool):
         raise TypeError(f"{name} must be a number, but got a bool.")
     if not isinstance(value, (numbers.Real, np.floating, np.integer)):
-        raise TypeError(
-            f"{name} must be a real number, but got {type(value).__name__}."
-        )
+        raise TypeError(f"{name} must be a real number, but got {type(value).__name__}.")
     if float(value) != int(value):
         raise ValueError(f"{name} must be a whole number, but got {value}.")
     if int(value) <= 0:
