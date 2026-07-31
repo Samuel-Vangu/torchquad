@@ -141,9 +141,7 @@ def load_lattice_vector(d, filename="lattice-33002-1024-1048576.9125"):
     return z
 
 
-import torch
 import numbers
-import warnings
 
 
 def _check_positive_whole_number(value, name):
@@ -250,6 +248,8 @@ class Lattice:
                 1048576, or if the dimension is not between 1 and 9125, or if
                 either is not a whole number.
         """
+        import torch
+
         number_of_points = _check_positive_whole_number(size[0], "The number of points")
         dim = _check_positive_whole_number(size[1], "The dimension")
 
@@ -287,12 +287,6 @@ class Lattice:
         mod = (index[:, None] * z[None, :]) % number_of_points  # (N, dim), exact
         points = mod.to(dtype) / number_of_points
 
-        if self._shift:
-            gen = torch.Generator(device=device)
-            if self._seed is not None:
-                gen.manual_seed(self._seed)
-            shift_values = torch.rand(dim, generator=gen, device=device)
-            points = torch.remainder(points + shift_values.to(dtype), 1)
         if self._shift:
             gen = torch.Generator(device=device)
             if self._seed is not None:
