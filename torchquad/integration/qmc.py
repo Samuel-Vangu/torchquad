@@ -242,8 +242,6 @@ class Lattice:
             ``[0, 1)``.
 
         Raises:
-            TypeError: If the number of points or the dimension is not a
-                (whole) number.
             ValueError: If the number of points is not between 1024 and
                 1048576, or if the dimension is not between 1 and 9125, or if
                 either is not a whole number.
