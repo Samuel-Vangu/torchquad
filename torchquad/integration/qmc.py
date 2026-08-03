@@ -184,11 +184,6 @@ class RandomizedLatinHypercube:
         Returns:
             backend tensor: ``[number_of_points, dim]`` randomized LHS points
             in ``[0, 1)``.
-
-        Raises:
-            TypeError: If the number of points or the dimension is not a
-                real number.
-            ValueError: If either is not a strictly positive whole number.
         """
         number_of_points = _check_positive_whole_number(size[0], "The number of points")
         dim = _check_positive_whole_number(size[1], "The dimension")
