@@ -30,6 +30,7 @@ Coverage runs on every backend.
 
 import numpy as np
 import torch
+import pytest
 
 from torchquad.integration.monte_carlo import MonteCarlo
 from torchquad.integration.qmc import Halton
@@ -201,6 +202,11 @@ def test_halton_preserves_gradient():
 # and fixed while developing the torch backend (see the Halton class docstring
 # Notes for the full explanation of each).
 # =============================================================================
+
+
+def test_halton_rejects_invalid_backend():
+    with pytest.raises(ValueError, match="backend"):
+        Halton(backend="bogus")
 
 
 def test_halton_no_power_of_two_warning():

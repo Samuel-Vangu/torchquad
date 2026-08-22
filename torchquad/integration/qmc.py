@@ -2,6 +2,8 @@ import warnings
 
 from autoray import numpy as anp
 
+_VALID_BACKENDS = ("torch", "numpy", "jax", "tensorflow")
+
 
 class Sobol:
     """A scrambled Sobol low-discrepancy sampler, shaped like :class:`RNG`.
@@ -209,15 +211,24 @@ class Halton:
         """Initialize a Halton sampler.
 
         Args:
-            backend (string): Numerical backend, e.g. "torch". Must match the
-                backend of the integration domain it will be used with.
+            backend (string): Numerical backend. Must be one of "torch",
+                "numpy", "jax", or "tensorflow", and match the backend of the
+                integration domain it will be used with.
             seed (int or None, optional): Seed for the scrambling. If None,
                 the scrambling is randomised. Defaults to None.
             scramble (bool, optional): Whether to apply digit scrambling
                 (see class Notes), which randomises the sequence while
                 preserving its low discrepancy and yields an unbiased
                 estimator. Defaults to True.
+
+        Raises:
+            ValueError: If backend is not one of "torch", "numpy", "jax", or
+                "tensorflow".
         """
+        if backend not in _VALID_BACKENDS:
+            raise ValueError(
+                f'Halton only supports backends {_VALID_BACKENDS}, but got "{backend}".'
+            )
         self._backend = backend
         self._seed = seed
         self._scramble = scramble
