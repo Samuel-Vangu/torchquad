@@ -3,6 +3,12 @@ import warnings
 from autoray import numpy as anp
 
 
+import numpy as np
+from pathlib import Path
+
+from functools import lru_cache
+
+
 class Sobol:
     """A scrambled Sobol low-discrepancy sampler, shaped like :class:`RNG`.
 
@@ -93,67 +99,63 @@ class Sobol:
         return anp.array(points, dtype=dtype, like=self._backend)
 
 
-import numpy as np
-from pathlib import Path
-
 DATA_DIR = Path(__file__).resolve().parent
 
 
-def load_lattice_vector(d, filename="lattice-33002-1024-1048576.9125"):
-    """
-    Load the first d components of the generating vector z
-    from a generating vectors file for rank-1 lattice rules.
+_MIN_POINTS = 1024
+_MAX_POINTS = 1048576
+_LATTICE_FILE = "lattice-33002-1024-1048576.npz"
 
 
-    The file must contain two columns:
-        dimension   z_j
-
-    Parameters
-    ----------
-    d : int
-        Desired dimension.
-    filename : str
-        Path to the generating vectors file.
-
-    Returns
-    -------
-    z : np.ndarray
-        NumPy array [z1, z2, ..., zd] with dtype uint64.
-    """
+@lru_cache(maxsize=None)
+def _load_full_generating_vector(filename):
+    """Load and cache the full generating vector array from disk (once)."""
     path = DATA_DIR / filename
+    with np.load(path) as data:
+        generating_vector = data["generating_vector"]
+    return generating_vector.astype(np.uint64)
+
+
+def _max_dimension(filename=_LATTICE_FILE):
+    """Return the largest dimension supported by the generating vector file."""
+    return _load_full_generating_vector(filename).shape[0]
+
+
+def load_lattice_vector(d, filename=_LATTICE_FILE):
+    """Load the first d components of the generating vector z from a
+    generating vectors file for rank-1 lattice rules.
+
+    The full array is loaded from disk only once (cached); each call
+    afterwards just slices the already-loaded array. The valid range for
+    ``d`` is derived from the file itself, not hard-coded. The file must
+    contain a single array ``generating_vector`` with one component per
+    dimension.
+
+    Args:
+        d (int): Desired dimension.
+        filename (str, optional): Path to the generating vectors ``.npz``
+            file. Defaults to ``_LATTICE_FILE``.
+
+    Returns:
+        np.ndarray: Array [z1, z2, ..., zd] with dtype uint64.
+
+    Raises:
+        ValueError: If d is not strictly positive, or if d exceeds the
+            number of components available in the file.
+    """
     if d <= 0:
         raise ValueError("The dimension d must be strictly positive.")
 
-    data = np.loadtxt(path, dtype=np.uint64)
+    generating_vector = _load_full_generating_vector(filename)
 
-    if data.ndim != 2 or data.shape[1] < 2:
-        raise ValueError("The file must contain at least two columns: dimension and z_j.")
-
-    max_d = data.shape[0]
+    max_d = generating_vector.shape[0]
 
     if d > max_d:
         raise ValueError(
             f"Requested dimension d={d}, but the file contains only {max_d} components."
         )
 
-    z = data[:d, 1]
-
-    return z
-
-
-import numbers
-
-
-def _check_positive_whole_number(value, name):
-    """Accept any real number equal to a whole number (2, 2.0, np.float64(2.0), ...),
-    reject bool (a subtype of int in Python) and anything non-integral (2.5)."""
-    if isinstance(value, bool):
-        raise TypeError(f"{name} must be a number, but got a bool.")
-    if not isinstance(value, (numbers.Real, np.floating, np.integer)):
-        raise TypeError(f"{name} must be a real number, but got {type(value).__name__}.")
-    if float(value) != int(value):
-        raise ValueError(f"{name} must be a whole number, but got {value}.")
-    return int(value)
+    return generating_vector[:d]
 
 
 class Lattice:
@@ -167,10 +169,12 @@ class Lattice:
 
     Like :class:`RNG`, an instance exposes ``uniform(size, dtype)`` returning
     points in ``[0, 1)`` as a PyTorch tensor, so it is a drop-in replacement for
-    the sampler ``MonteCarlo`` uses internally.
+    the sampler ``MonteCarlo`` uses internally. Unlike :class:`Sobol`, which
+    supports multiple backends via SciPy, this sampler only supports the
+    ``torch`` backend.
 
     The generating vector is loaded from the file
-    ``lattice-33002-1024-1048576.9125``, obtained from the *Lattice Rule
+    ``lattice-33002-1024-1048576.npz``, obtained from the *Lattice Rule
     Generating Vectors* collection maintained by Frances Y. Kuo. This file
     provides an extensible rank-1 lattice rule for dimensions up to 9125 and
     sample sizes from 1024 to 1048576.
@@ -203,11 +207,13 @@ class Lattice:
     placement differs.
 
     Notes:
-        - The dimension must be a whole number between 1 and 9125, inclusive
-          (e.g. ``5`` or ``5.0`` are both accepted; ``5.5`` is not).
-        - The number of points must be a whole number between 1024 and
-          1048576, inclusive.
-        - The number of points should be a power of two for the simple
+        - The dimension must be a whole number, and no larger than what the
+          loaded generating vector file supports (currently 9125; see
+          :func:`load_lattice_vector`, which derives this bound from the file
+          itself rather than a hard-coded constant).
+        - The number of points must be a whole number between
+          :data:`_MIN_POINTS` and :data:`_MAX_POINTS`, inclusive.
+        - The number of points must be a power of two for the simple
           construction above to be valid for this extensible lattice rule.
         - This sampler targets the eager :meth:`MonteCarlo.integrate` path, not
           the JIT-compiled one (which builds its own RNG internally).
@@ -216,17 +222,26 @@ class Lattice:
           affects unrelated random draws elsewhere in your program.
     """
 
-    def __init__(self, seed=None, shift=True):
+    def __init__(self, backend, seed=None, shift=True):
         """Initialize a rank-1 lattice sampler.
 
         Args:
+            backend (string): Numerical backend. Only "torch" is supported,
+                since this sampler relies directly on PyTorch's tensor and
+                RNG machinery with no fallback path for other backends.
             seed (int or None, optional): Seed used to generate the random
                 shift, redrawn on every call to ``uniform``. A fixed seed
                 makes that draw reproducible across calls; if None, each
                 call gets an independent random shift. Defaults to None.
             shift (bool, optional): Whether to apply a random shift modulo one
                 to the lattice points. Defaults to True.
+
+        Raises:
+            ValueError: If backend is not "torch".
         """
+        if backend != "torch":
+            raise ValueError(f'Lattice only supports the "torch" backend, but got "{backend}".')
+        self._backend = backend
         self._seed = seed
         self._shift = shift
 
@@ -242,45 +257,34 @@ class Lattice:
             ``[0, 1)``.
 
         Raises:
-            ValueError: If the number of points is not between 1024 and
-                1048576, or if the dimension is not between 1 and 9125, or if
-                either is not a whole number.
+            ValueError: If the number of points is not between
+                :data:`_MIN_POINTS` and :data:`_MAX_POINTS`, is not a power of 2,
+                or if the dimension is invalid for the loaded generating vector
+                file (see :func:`load_lattice_vector`).
         """
         import torch
 
-        number_of_points = _check_positive_whole_number(size[0], "The number of points")
-        dim = _check_positive_whole_number(size[1], "The dimension")
+        number_of_points, dim = int(size[0]), int(size[1])
 
-        if not 1024 <= number_of_points <= 1048576:
+        if not _MIN_POINTS <= number_of_points <= _MAX_POINTS:
             raise ValueError(
-                "The number of points must be between 1024 and 1048576, "
+                f"The number of points must be between {_MIN_POINTS} and {_MAX_POINTS}, "
                 f"but got {number_of_points}."
             )
 
-        if not 1 <= dim <= 9125:
-            raise ValueError(f"The dimension must be between 1 and 9125, but got {dim}.")
-
         if number_of_points & (number_of_points - 1) != 0:
-            warnings.warn(
-                "The simple lattice construction used here requires the number "
-                f"of points to be a power of 2, but {number_of_points} was "
-                "requested.",
-                stacklevel=2,
+            raise ValueError(
+                "The simple lattice construction used here is only valid when the "
+                f"number of points is a power of 2, but {number_of_points} was "
+                "requested."
             )
 
         device = torch.empty(0).device
 
-        # z and index are kept in INT64 for the whole modular reduction, and
-        # only converted to `dtype` at the very last step. Computing
-        # (index * z) directly in `dtype` (e.g. float32, as requested by the
-        # caller) loses precision catastrophically for realistic generating
-        # vector magnitudes (millions) and sample sizes: verified to return
-        # completely wrong points (e.g. 0.0 instead of 0.6358) for a
-        # representative (i, z, N) triple in float32. int64 comfortably
-        # covers the largest possible product for this sampler's documented
-        # size limits (N <= 1048576, and generating vector entries typically
-        # well under 1e8).
-        z = torch.tensor(load_lattice_vector(d=dim), dtype=torch.int64)
+        # `dim`'s validity (>= 1 and within the file's supported range) is
+        # checked inside load_lattice_vector, derived from the actual data
+        # rather than a hard-coded bound here.
+        z = torch.tensor(load_lattice_vector(d=dim, filename=_LATTICE_FILE), dtype=torch.int64)
         index = torch.arange(number_of_points, dtype=torch.int64, device=device)
         mod = (index[:, None] * z[None, :]) % number_of_points  # (N, dim), exact
         points = mod.to(dtype) / number_of_points
@@ -296,4 +300,4 @@ class Lattice:
             shift_values = torch.rand(dim, generator=gen, device=device)
             points = torch.remainder(points + shift_values.to(dtype), 1)
 
-        return points.to(dtype)
+        return points

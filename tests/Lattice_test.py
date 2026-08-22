@@ -5,9 +5,20 @@ smooth functions accurately, (b) beat plain pseudo-random Monte Carlo at the sam
 sample count, and (c) reproduce bit-for-bit for a fixed seed -- the same three
 properties covered for ``Sobol`` in ``test_sobol.py``, reused here almost verbatim.
 
-Unlike ``Sobol``, ``Lattice`` only supports the torch backend (it has no
-``backend`` constructor argument and works with torch tensors directly), so all
-coverage below runs on torch only; there is no per-backend loop.
+Unlike ``Sobol``, ``Lattice`` only supports the torch backend: it relies directly
+on torch tensors and ``torch.Generator`` with no fallback path for other
+backends, so its ``backend`` constructor argument only accepts ``"torch"``
+(anything else raises ``ValueError``). All coverage below runs on torch only;
+there is no per-backend loop.
+
+Like ``Sobol.uniform``, ``Lattice.uniform`` casts its ``size`` components with
+plain ``int(...)``, relying on the fact that the only real caller
+(``MonteCarlo.calculate_sample_points``) always passes an already-validated
+``N`` (checked by ``BaseIntegrator._check_inputs``) and a ``dim`` derived from
+``integration_domain.shape[0]``, which is always a clean Python int. There is
+therefore no dedicated test here for malformed ``size`` components (e.g. bools
+or non-whole floats); ``Sobol``'s test suite does not cover this either, for
+the same reason.
 
 The remaining tests target properties that are specific to the rank-1 lattice
 construction and have no Sobol equivalent: the closed-form point formula, the
@@ -20,7 +31,13 @@ import pytest
 import torch
 
 from torchquad.integration.monte_carlo import MonteCarlo
-from torchquad.integration.qmc import Lattice, load_lattice_vector
+from torchquad.integration.qmc import (
+    Lattice,
+    load_lattice_vector,
+    _MIN_POINTS,
+    _MAX_POINTS,
+    _max_dimension,
+)
 from torchquad.utils.set_up_backend import set_up_backend
 from helper_functions import setup_test_for_backend
 
@@ -28,7 +45,9 @@ from helper_functions import setup_test_for_backend
 # prod_i cos(pi/2 * x_i) over [0, 1]^dim integrates to (2/pi)^dim. QMC should
 # shine here.
 _DIM = 3
-_N = 2**13  # 8192 points: a power of 2, inside the [1024, 1048576] range Lattice requires
+_N = (
+    2**13
+)  # 8192 points: a power of 2, inside the [_MIN_POINTS, _MAX_POINTS] range Lattice requires
 _DOMAIN = [[0.0, 1.0]] * _DIM
 _EXPECTED = (2.0 / np.pi) ** _DIM
 
@@ -61,7 +80,7 @@ def _lattice_accuracy_test(backend, dtype_name=None):
             dim=_DIM,
             N=_N,
             integration_domain=_DOMAIN,
-            rng=Lattice(seed=0),
+            rng=Lattice(backend="torch", seed=0),
         )
     )
     assert abs(result - _EXPECTED) < 1e-3, (
@@ -83,7 +102,7 @@ def _lattice_beats_mc_test(backend, dtype_name=None):
                 dim=_DIM,
                 N=_N,
                 integration_domain=_DOMAIN,
-                rng=Lattice(seed=0),
+                rng=Lattice(backend="torch", seed=0),
             )
         )
         - _EXPECTED
@@ -109,7 +128,7 @@ def _lattice_determinism_test(backend, dtype_name=None):
                 dim=_DIM,
                 N=_N,
                 integration_domain=_DOMAIN,
-                rng=Lattice(seed=42),
+                rng=Lattice(backend="torch", seed=42),
             )
         )
 
@@ -138,7 +157,7 @@ def test_lattice_preserves_gradient():
         dim=1,
         N=_N,
         integration_domain=[[0.0, 1.0]],
-        rng=Lattice(seed=0),
+        rng=Lattice(backend="torch", seed=0),
     )
     result.backward()
     assert abs(_to_float(parameter.grad) - 0.5) < 1e-3, (
@@ -147,9 +166,15 @@ def test_lattice_preserves_gradient():
 
 
 # ---------------------------------------------------------------------------
-# Lattice-specific tests: the closed-form construction, the one-shot shift,
-# and input validation on N and dim. None of these have a Sobol equivalent.
+# Lattice-specific tests: backend validation, the closed-form construction,
+# the one-shot shift, and input validation on N and dim. None of these have a
+# Sobol equivalent.
 # ---------------------------------------------------------------------------
+
+
+def test_lattice_rejects_non_torch_backend():
+    with pytest.raises(ValueError, match="torch"):
+        Lattice(backend="numpy")
 
 
 def test_lattice_matches_closed_form_without_shift():
@@ -165,7 +190,7 @@ def test_lattice_matches_closed_form_without_shift():
     i = np.arange(n, dtype=np.int64)
     expected = ((i[:, None] * z[None, :]) % n) / n
 
-    points = Lattice(shift=False).uniform([n, dim], torch.float64).cpu().numpy()
+    points = Lattice(backend="torch", shift=False).uniform([n, dim], torch.float64).cpu().numpy()
 
     np.testing.assert_allclose(
         points,
@@ -180,7 +205,7 @@ def test_lattice_same_seed_reproduces_shift_across_calls():
     a fixed seed, each redraw must reproduce the same values, so successive
     calls on the same instance return identical points."""
     set_up_backend("torch", "float64")
-    lattice = Lattice(seed=0, shift=True)
+    lattice = Lattice(backend="torch", seed=0, shift=True)
 
     first = lattice.uniform([1024, 2], torch.float64).clone()
     second = lattice.uniform([1024, 2], torch.float64)
@@ -196,7 +221,7 @@ def test_lattice_unseeded_shift_differs_across_calls():
     shift, so successive calls on the same instance must return different
     points."""
     set_up_backend("torch", "float64")
-    lattice = Lattice(shift=True)  # no seed
+    lattice = Lattice(backend="torch", shift=True)  # no seed
 
     first = lattice.uniform([1024, 2], torch.float64).clone()
     second = lattice.uniform([1024, 2], torch.float64)
@@ -213,8 +238,8 @@ def test_lattice_shift_changes_points():
     set_up_backend("torch", "float64")
     n, dim = 1024, 3
 
-    unshifted = Lattice(shift=False).uniform([n, dim], torch.float64)
-    shifted = Lattice(seed=0, shift=True).uniform([n, dim], torch.float64)
+    unshifted = Lattice(backend="torch", shift=False).uniform([n, dim], torch.float64)
+    shifted = Lattice(backend="torch", seed=0, shift=True).uniform([n, dim], torch.float64)
 
     assert not torch.equal(unshifted, shifted), (
         "Shifted points must not be identical to the unshifted lattice"
@@ -227,8 +252,8 @@ def test_lattice_different_seeds_give_different_shifts():
     set_up_backend("torch", "float64")
     n, dim = 1024, 3
 
-    points_a = Lattice(seed=1, shift=True).uniform([n, dim], torch.float64)
-    points_b = Lattice(seed=2, shift=True).uniform([n, dim], torch.float64)
+    points_a = Lattice(backend="torch", seed=1, shift=True).uniform([n, dim], torch.float64)
+    points_b = Lattice(backend="torch", seed=2, shift=True).uniform([n, dim], torch.float64)
 
     assert not torch.equal(points_a, points_b), (
         "Different seeds should not produce the same shifted lattice"
@@ -241,8 +266,8 @@ def test_lattice_seed_ignored_when_shift_false():
     set_up_backend("torch", "float64")
     n, dim = 1024, 3
 
-    points_a = Lattice(seed=1, shift=False).uniform([n, dim], torch.float64)
-    points_b = Lattice(seed=99, shift=False).uniform([n, dim], torch.float64)
+    points_a = Lattice(backend="torch", seed=1, shift=False).uniform([n, dim], torch.float64)
+    points_b = Lattice(backend="torch", seed=99, shift=False).uniform([n, dim], torch.float64)
 
     assert torch.equal(points_a, points_b), "Unshifted lattice points must not depend on the seed"
 
@@ -253,60 +278,48 @@ def test_lattice_points_lie_in_unit_cube():
     n, dim = 2048, 5
 
     for shift in (False, True):
-        points = Lattice(seed=0, shift=shift).uniform([n, dim], torch.float64)
+        points = Lattice(backend="torch", seed=0, shift=shift).uniform([n, dim], torch.float64)
         assert torch.all(points >= 0) and torch.all(points < 1), (
             f"Lattice points (shift={shift}) fall outside [0, 1)"
         )
 
 
-def test_lattice_accepts_whole_number_as_float():
-    """A whole number given as a float (e.g. 1024.0) must be accepted: only
-    non-integral values are invalid, not the float type itself."""
+def test_lattice_rejects_non_power_of_two_point_count():
+    """The simple lattice construction is only valid when N is a power of 2;
+    a non-power-of-two N (even if within [_MIN_POINTS, _MAX_POINTS]) must
+    raise, since the construction's validity guarantee does not hold
+    otherwise."""
     set_up_backend("torch", "float64")
-    Lattice(shift=False).uniform([1024.0, 2.0], torch.float64)  # must not raise
+    with pytest.raises(ValueError, match="power of 2"):
+        Lattice(backend="torch", shift=False).uniform([1030, 2], torch.float64)
 
 
-def test_lattice_warns_on_non_power_of_two_point_count():
-    """The simple lattice construction requires N to be a power of 2; a
-    non-power-of-two N (but still in [1024, 1048576]) must work but emit a
-    UserWarning rather than fail outright."""
-    set_up_backend("torch", "float64")
-    with pytest.warns(UserWarning, match="power of 2"):
-        Lattice(shift=False).uniform([1030, 2], torch.float64)
-
-
-@pytest.mark.parametrize("bad_n", [1023, 1048577, 500, 2_000_000])
+@pytest.mark.parametrize("bad_n", [_MIN_POINTS - 1, _MAX_POINTS + 1, 500, 2_000_000])
 def test_lattice_rejects_out_of_range_point_counts(bad_n):
-    """N below 1024 or above 1048576 must raise, near the boundary or far
-    outside it."""
+    """N below _MIN_POINTS or above _MAX_POINTS must raise, near the boundary
+    or far outside it."""
     with pytest.raises(ValueError):
-        Lattice().uniform([bad_n, 2], torch.float64)
+        Lattice(backend="torch").uniform([bad_n, 2], torch.float64)
 
 
-@pytest.mark.parametrize("bad_dim", [0, -1, 9126, 20000])
-def test_lattice_rejects_out_of_range_dimensions(bad_dim):
-    """dim below 1 or above 9125 must raise, near the boundary or far outside
-    it."""
-    with pytest.raises(ValueError):
-        Lattice().uniform([1024, bad_dim], torch.float64)
+def test_lattice_rejects_out_of_range_dimensions():
+    """dim below 1 or above the generating vector file's max must raise, near
+    the boundary or far outside it.
 
-
-def test_lattice_rejects_non_whole_number_of_points():
-    """A fractional N (e.g. 1024.5) is not a valid point count."""
-    with pytest.raises(ValueError):
-        Lattice().uniform([1024.5, 2], torch.float64)
-
-
-def test_lattice_rejects_bool_as_size_component():
-    """bool is a subtype of int in Python; it must still be rejected as a size
-    component rather than silently treated as 0 or 1."""
-    with pytest.raises(TypeError):
-        Lattice().uniform([True, 2], torch.float64)
+    Not parametrized: the upper bound is derived from the actual data file
+    via ``_max_dimension()``, which must run inside a test function rather
+    than at module collection time, to avoid loading the file on import.
+    """
+    max_dim = _max_dimension()
+    for bad_dim in [0, -1, max_dim + 1, max_dim + 10000]:
+        with pytest.raises(ValueError):
+            Lattice(backend="torch").uniform([1024, bad_dim], torch.float64)
 
 
 if __name__ == "__main__":
     for _test in (_lattice_accuracy_test, _lattice_beats_mc_test, _lattice_determinism_test):
         _test("torch")
+    test_lattice_rejects_non_torch_backend()
     test_lattice_preserves_gradient()
     test_lattice_matches_closed_form_without_shift()
     test_lattice_same_seed_reproduces_shift_across_calls()
@@ -315,6 +328,6 @@ if __name__ == "__main__":
     test_lattice_different_seeds_give_different_shifts()
     test_lattice_seed_ignored_when_shift_false()
     test_lattice_points_lie_in_unit_cube()
-    test_lattice_accepts_whole_number_as_float()
-    test_lattice_warns_on_non_power_of_two_point_count()
+    test_lattice_rejects_non_power_of_two_point_count()
+    test_lattice_rejects_out_of_range_dimensions()
     print("All Lattice tests passed!")
