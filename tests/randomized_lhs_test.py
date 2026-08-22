@@ -31,9 +31,7 @@ On top of that, this file adds tests for properties SPECIFIC to LHS:
       `torch.Generator()` has a FIXED default internal state (verified: two
       fresh, un-seeded generators produced the identical draw), so forgetting
       to call `.seed()` in that branch would silently make every `seed=None`
-      call return the exact same "random" sample;
-    - input validation: `size` entries must be strictly positive whole
-      numbers, but need not be `int` (e.g. `4.0` is accepted and converted).
+      call return the exact same "random" sample.
 
 Coverage runs on every backend.
 """
@@ -280,32 +278,6 @@ def test_lhs_points_in_unit_cube():
     assert bool((points >= 0).all()) and bool((points < 1).all())
 
 
-def test_lhs_size_accepts_whole_valued_floats():
-    """`size` entries need not be `int`: any strictly positive whole number
-    (e.g. `4.0`) must be accepted and converted."""
-    points = RandomizedLatinHypercube(backend="torch", seed=0).uniform([4.0, 2.0], torch.float64)
-    assert points.shape == (4, 2)
-
-
-def test_lhs_size_rejects_non_whole_values():
-    with __import__("pytest").raises(ValueError):
-        RandomizedLatinHypercube(backend="torch", seed=0).uniform([4.5, 2], torch.float64)
-
-
-def test_lhs_size_rejects_non_positive_values():
-    with __import__("pytest").raises(ValueError):
-        RandomizedLatinHypercube(backend="torch", seed=0).uniform([0, 2], torch.float64)
-    with __import__("pytest").raises(ValueError):
-        RandomizedLatinHypercube(backend="torch", seed=0).uniform([-4, 2], torch.float64)
-
-
-def test_lhs_size_rejects_non_numeric_and_bool():
-    with __import__("pytest").raises(TypeError):
-        RandomizedLatinHypercube(backend="torch", seed=0).uniform(["4", 2], torch.float64)
-    with __import__("pytest").raises(TypeError):
-        RandomizedLatinHypercube(backend="torch", seed=0).uniform([True, 2], torch.float64)
-
-
 if __name__ == "__main__":
     from torchquad.utils.set_up_backend import set_up_backend
 
@@ -319,8 +291,4 @@ if __name__ == "__main__":
     test_lhs_seed_none_randomizes_every_call()
     test_lhs_fixed_seed_is_reproducible()
     test_lhs_points_in_unit_cube()
-    test_lhs_size_accepts_whole_valued_floats()
-    test_lhs_size_rejects_non_whole_values()
-    test_lhs_size_rejects_non_positive_values()
-    test_lhs_size_rejects_non_numeric_and_bool()
     print("All RandomizedLatinHypercube tests passed!")

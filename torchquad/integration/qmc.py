@@ -3,6 +3,9 @@ import warnings
 from autoray import numpy as anp
 
 
+_VALID_BACKENDS = ("torch", "numpy", "jax", "tensorflow")
+
+
 class Sobol:
     """A scrambled Sobol low-discrepancy sampler, shaped like :class:`RNG`.
 
@@ -93,26 +96,6 @@ class Sobol:
         return anp.array(points, dtype=dtype, like=self._backend)
 
 
-import numbers
-
-import numpy as np
-
-
-def _check_positive_whole_number(value, name):
-    """Accept any strictly positive real number equal to a whole number
-    (2, 2.0, np.float64(2.0), ...); reject bool (a bool is technically an
-    int subtype in Python) and anything non-integral (2.5) or non-positive."""
-    if isinstance(value, bool):
-        raise TypeError(f"{name} must be a number, but got a bool.")
-    if not isinstance(value, (numbers.Real, np.floating, np.integer)):
-        raise TypeError(f"{name} must be a real number, but got {type(value).__name__}.")
-    if float(value) != int(value):
-        raise ValueError(f"{name} must be a whole number, but got {value}.")
-    if int(value) <= 0:
-        raise ValueError(f"{name} must be strictly positive, but got {value}.")
-    return int(value)
-
-
 class RandomizedLatinHypercube:
     """A randomized Latin Hypercube (LHS) sampler, shaped like :class:`RNG`
     and :class:`Sobol`.
@@ -164,11 +147,21 @@ class RandomizedLatinHypercube:
         """Initialize a randomized Latin Hypercube sampler.
 
         Args:
-            backend (string): Numerical backend, e.g. "torch". Must match the
-                backend of the integration domain it will be used with.
+            backend (string): Numerical backend. Must be one of "torch",
+                "numpy", "jax", or "tensorflow", and match the backend of the
+                integration domain it will be used with.
             seed (int or None, optional): Seed for the random permutations and
                 jitter. If None, sampling is randomised. Defaults to None.
+
+        Raises:
+            ValueError: If backend is not one of "torch", "numpy", "jax", or
+                "tensorflow".
         """
+        if backend not in _VALID_BACKENDS:
+            raise ValueError(
+                f"RandomizedLatinHypercube only supports backends {_VALID_BACKENDS}, "
+                f'but got "{backend}".'
+            )
         self._backend = backend
         self._seed = seed
 
@@ -176,18 +169,14 @@ class RandomizedLatinHypercube:
         """Draw randomized LHS points in ``[0, 1)``.
 
         Args:
-            size (list): Two-element ``[number_of_points, dim]`` shape. Each
-                element may be any strictly positive whole number (e.g. ``4``
-                or ``4.0``); it is converted to ``int``.
+            size (list): Two-element ``[number_of_points, dim]`` shape.
             dtype (backend dtype): Floating point dtype of the returned tensor.
 
         Returns:
             backend tensor: ``[number_of_points, dim]`` randomized LHS points
             in ``[0, 1)``.
         """
-        number_of_points = _check_positive_whole_number(size[0], "The number of points")
-        dim = _check_positive_whole_number(size[1], "The dimension")
-        n = number_of_points
+        n, dim = int(size[0]), int(size[1])
 
         if self._backend == "torch":
             # Native torch construction (same argsort trick as the NumPy/QMCPy
@@ -218,5 +207,5 @@ class RandomizedLatinHypercube:
         from scipy.stats import qmc
 
         sampler = qmc.LatinHypercube(d=dim, scramble=True, seed=self._seed)
-        points = sampler.random(number_of_points)
+        points = sampler.random(n)
         return anp.array(points, dtype=dtype, like=self._backend)
