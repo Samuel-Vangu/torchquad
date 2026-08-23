@@ -5,8 +5,11 @@ from autoray import numpy as anp
 
 import numpy as np
 from pathlib import Path
+from .rng import RNG
 
 from functools import lru_cache
+
+_VALID_BACKENDS = ("torch", "numpy", "jax", "tensorflow")
 
 
 class Sobol:
@@ -168,10 +171,11 @@ class Lattice:
     integrands.
 
     Like :class:`RNG`, an instance exposes ``uniform(size, dtype)`` returning
-    points in ``[0, 1)`` as a PyTorch tensor, so it is a drop-in replacement for
-    the sampler ``MonteCarlo`` uses internally. Unlike :class:`Sobol`, which
-    supports multiple backends via SciPy, this sampler only supports the
-    ``torch`` backend.
+    points in ``[0, 1)`` as a backend tensor, so it is a drop-in replacement for
+    the sampler ``MonteCarlo`` uses internally. The construction is a few lines
+    of array arithmetic, dispatched across backends via ``autoray``, so it runs
+    natively on all four supported backends without any per-backend branching
+    or additional dependency.
 
     The generating vector is loaded from the file
     ``lattice-33002-1024-1048576.npz``, obtained from the *Lattice Rule
@@ -202,6 +206,15 @@ class Lattice:
     successive calls reproduce the same points; without a seed, each call
     draws its own independent shift.
 
+    When ``tent=True``, a Baker's transform (tent map) is applied to every
+    point *after* the shift: ``phi(x) = 1 - |2x - 1|``. Lattice rules recover
+    their best convergence rate for *periodic* integrands; for a non-periodic
+    integrand, this transform periodizes it (without changing the value of
+    the integral), which can dramatically reduce the integration error for
+    smooth non-periodic integrands. Defaults to False, since it changes which
+    points are evaluated and is not always beneficial (e.g. for an integrand
+    that is already periodic on the domain).
+
     As with plain Monte Carlo, the sample points are constants, so gradients
     still flow through the integrand and the integration domain; only the point
     placement differs.
@@ -217,53 +230,65 @@ class Lattice:
           construction above to be valid for this extensible lattice rule.
         - This sampler targets the eager :meth:`MonteCarlo.integrate` path, not
           the JIT-compiled one (which builds its own RNG internally).
-        - The random shift uses a private ``torch.Generator``, not PyTorch's
-          global RNG state, so constructing or calling this sampler never
-          affects unrelated random draws elsewhere in your program.
+        - The random shift is drawn via a fresh, per-call :class:`RNG`
+          instance rather than any backend's global RNG state, so
+          constructing or calling this sampler never affects unrelated
+          random draws elsewhere in your program.
+        - Unshifted points are bit-identical across backends; shifted points
+          are reproducible for a fixed ``seed`` within a backend, but the
+          shift itself is drawn independently per backend, so shifted points
+          do not match bit-for-bit across backends.
     """
 
-    def __init__(self, backend, seed=None, shift=True):
+    def __init__(self, backend, seed=None, shift=True, tent=False):
         """Initialize a rank-1 lattice sampler.
 
         Args:
-            backend (string): Numerical backend. Only "torch" is supported,
-                since this sampler relies directly on PyTorch's tensor and
-                RNG machinery with no fallback path for other backends.
+            backend (string): Numerical backend. Must be one of "torch",
+                "numpy", "jax", or "tensorflow", and match the backend of the
+                integration domain it will be used with.
             seed (int or None, optional): Seed used to generate the random
                 shift, redrawn on every call to ``uniform``. A fixed seed
                 makes that draw reproducible across calls; if None, each
                 call gets an independent random shift. Defaults to None.
             shift (bool, optional): Whether to apply a random shift modulo one
                 to the lattice points. Defaults to True.
+            tent (bool, optional): Whether to apply a Baker's transform (tent
+                map) to the points after the shift, which periodizes a
+                non-periodic integrand and can substantially improve
+                convergence for smooth non-periodic integrands. Defaults to
+                False.
 
         Raises:
-            ValueError: If backend is not "torch".
+            ValueError: If backend is not one of "torch", "numpy", "jax", or
+                "tensorflow".
         """
-        if backend != "torch":
-            raise ValueError(f'Lattice only supports the "torch" backend, but got "{backend}".')
+        if backend not in _VALID_BACKENDS:
+            raise ValueError(
+                f'Lattice only supports backends {_VALID_BACKENDS}, but got "{backend}".'
+            )
         self._backend = backend
         self._seed = seed
         self._shift = shift
+        self._tent = tent
 
     def uniform(self, size, dtype):
         """Draw rank-1 lattice points in ``[0, 1)``.
 
         Args:
             size (list): Two-element ``[number_of_points, dim]`` shape.
-            dtype (torch dtype): Floating-point dtype of the returned tensor.
+            dtype (backend dtype): Floating-point dtype of the returned tensor.
 
         Returns:
-            torch tensor: ``[number_of_points, dim]`` lattice points in
+            backend tensor: ``[number_of_points, dim]`` lattice points in
             ``[0, 1)``.
 
         Raises:
             ValueError: If the number of points is not between
-                :data:`_MIN_POINTS` and :data:`_MAX_POINTS`, is not a power of 2,
-                or if the dimension is invalid for the loaded generating vector
-                file (see :func:`load_lattice_vector`).
+                :data:`_MIN_POINTS` and :data:`_MAX_POINTS`, is not a power of
+                2, or if the dimension is invalid for the loaded generating
+                vector file (see :func:`load_lattice_vector`).
         """
-        import torch
-
         number_of_points, dim = int(size[0]), int(size[1])
 
         if not _MIN_POINTS <= number_of_points <= _MAX_POINTS:
@@ -279,25 +304,20 @@ class Lattice:
                 "requested."
             )
 
-        device = torch.empty(0).device
+        z_np = load_lattice_vector(d=dim, filename=_LATTICE_FILE)
 
-        # `dim`'s validity (>= 1 and within the file's supported range) is
-        # checked inside load_lattice_vector, derived from the actual data
-        # rather than a hard-coded bound here.
-        z = torch.tensor(load_lattice_vector(d=dim, filename=_LATTICE_FILE), dtype=torch.int64)
-        index = torch.arange(number_of_points, dtype=torch.int64, device=device)
-        mod = (index[:, None] * z[None, :]) % number_of_points  # (N, dim), exact
-        points = mod.to(dtype) / number_of_points
+        z = anp.astype(anp.array(z_np, like=self._backend), "int64")
+        index = anp.astype(anp.arange(number_of_points, like=self._backend), "int64")
+        mod = (index[:, None] * z[None, :]) % number_of_points
+        points = anp.astype(mod, dtype) / number_of_points
 
         if self._shift:
-            gen = torch.Generator(device=device)
-            if self._seed is not None:
-                gen.manual_seed(self._seed)
-            else:
-                gen.seed()  # a fresh torch.Generator() otherwise keeps a fixed internal
-                # default seed, which would make every unseeded shift
-                # identical instead of independently random
-            shift_values = torch.rand(dim, generator=gen, device=device)
-            points = torch.remainder(points + shift_values.to(dtype), 1)
+            shift_values = RNG(backend=self._backend, seed=self._seed).uniform([dim], dtype)
+            points = (points + shift_values[None, :]) % 1.0
+
+        if self._tent:
+            # Baker's transform: periodizes the integrand so the lattice rule
+            # recovers its convergence rate on non-periodic integrands.
+            points = 1.0 - anp.abs(2.0 * points - 1.0)
 
         return points

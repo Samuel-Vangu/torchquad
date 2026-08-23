@@ -1,34 +1,35 @@
 """Tests for the rank-1 lattice quasi-Monte Carlo sampler.
 
-Lattice points plugged into ``MonteCarlo`` via the ``rng`` slot must (a) integrate
-smooth functions accurately, (b) beat plain pseudo-random Monte Carlo at the same
-sample count, and (c) reproduce bit-for-bit for a fixed seed -- the same three
-properties covered for ``Sobol`` in ``test_sobol.py``, reused here almost verbatim.
+Lattice points plugged into ``MonteCarlo`` via the ``rng`` slot must (a)
+integrate smooth functions accurately, (b) beat plain pseudo-random Monte
+Carlo at the same sample count, and (c) reproduce bit-for-bit for a fixed
+seed.
 
-Unlike ``Sobol``, ``Lattice`` only supports the torch backend: it relies directly
-on torch tensors and ``torch.Generator`` with no fallback path for other
-backends, so its ``backend`` constructor argument only accepts ``"torch"``
-(anything else raises ``ValueError``). All coverage below runs on torch only;
-there is no per-backend loop.
+The construction is a few lines of array arithmetic, dispatched across
+backends via ``autoray``, so it runs natively on all four supported backends
+without any per-backend branching or additional dependency. The
+accuracy/beats-mc/determinism tests below therefore run on every backend.
 
-Like ``Sobol.uniform``, ``Lattice.uniform`` casts its ``size`` components with
-plain ``int(...)``, relying on the fact that the only real caller
+``Lattice.uniform`` casts its ``size`` components with plain ``int(...)``,
+relying on the fact that the only real caller
 (``MonteCarlo.calculate_sample_points``) always passes an already-validated
 ``N`` (checked by ``BaseIntegrator._check_inputs``) and a ``dim`` derived from
 ``integration_domain.shape[0]``, which is always a clean Python int. There is
 therefore no dedicated test here for malformed ``size`` components (e.g. bools
-or non-whole floats); ``Sobol``'s test suite does not cover this either, for
-the same reason.
+or non-whole floats).
 
 The remaining tests target properties that are specific to the rank-1 lattice
-construction and have no Sobol equivalent: the closed-form point formula, the
-one-shot random shift (drawn once and reused for the sampler's lifetime), and
-input validation on N and dim.
+construction: the closed-form point formula, the one-shot random shift (drawn
+once and reused for the sampler's lifetime), the optional Baker's transform
+(``tent=True``), and input validation on N and dim. These run on the torch
+backend only -- the per-backend tests above already cover cross-backend
+correctness at the integration level.
 """
 
 import numpy as np
 import pytest
 import torch
+from autoray import numpy as anp
 
 from torchquad.integration.monte_carlo import MonteCarlo
 from torchquad.integration.qmc import (
@@ -39,9 +40,9 @@ from torchquad.integration.qmc import (
     _max_dimension,
 )
 from torchquad.utils.set_up_backend import set_up_backend
-from helper_functions import setup_test_for_backend
+from helper_functions import setup_test_for_backend, compute_integration_test_errors
 
-# Same smooth, non-separable-into-a-polynomial integrand as the Sobol tests:
+# A smooth, non-separable-into-a-polynomial integrand:
 # prod_i cos(pi/2 * x_i) over [0, 1]^dim integrates to (2/pi)^dim. QMC should
 # shine here.
 _DIM = 3
@@ -60,15 +61,60 @@ def _to_float(result):
 
 
 def _integrand(x):
-    from autoray import numpy as anp
-
     return anp.prod(anp.cos(x * (np.pi / 2.0)), axis=1)
 
 
+def _nonperiodic_integrand(x):
+    """A smooth, genuinely non-periodic integrand: prod_i x_i, integrating to
+    (1/2)^dim over [0, 1]^dim. f(0) = 0 but f(1) = 1 per axis, so its periodic
+    extension has a jump discontinuity -- exactly the case Baker's transform
+    is meant to fix.
+    """
+
+    return anp.prod(x, axis=1)
+
+
 # ---------------------------------------------------------------------------
-# Tests reused from the Sobol suite: accuracy, beating plain MC, determinism,
-# and gradient flow. The backend loop collapses to "torch" only.
+# Accuracy, beating plain MC, determinism, and gradient flow. Runs per
+# backend.
 # ---------------------------------------------------------------------------
+
+
+def _lattice_collection_test(backend, dtype_name=None):
+    """Lattice-based MC must integrate the shared analytic test-function
+    collection accurately, at each dimension it covers.
+
+    Bounds were derived empirically across all four backends (numpy, torch,
+    tensorflow, jax) with seed=0. The dim=1 bound is noticeably looser than
+    the equivalent RandomizedLatinHypercube bound: the worst offender is a
+    non-periodic quartic polynomial with odd-order terms, and an unshifted
+    rank-1 lattice (tent=False, the default here) only recovers its best
+    convergence rate on periodic integrands (see the Lattice docstring).
+    """
+    mc = MonteCarlo()
+    cases = [(1, 2**12, 0.5), (3, 2**12, 0.07), (10, 2**11, 6e-4)]
+    for integration_dim, N, bound in cases:
+        errors, funcs = compute_integration_test_errors(
+            mc.integrate,
+            {"N": N, "dim": integration_dim, "rng": Lattice(backend=backend, seed=0)},
+            integration_dim=integration_dim,
+            use_complex=True,
+            backend=backend,
+        )
+        for error, test_function in zip(errors, funcs):
+            assert test_function.get_order() > 0 or error == 0.0
+            assert error < bound, (
+                f"Lattice dim={integration_dim} error {error} exceeds {bound} "
+                f"for {type(test_function).__name__}"
+            )
+
+
+test_lattice_collection_numpy = setup_test_for_backend(_lattice_collection_test, "numpy", "float64")
+test_lattice_collection_torch = setup_test_for_backend(_lattice_collection_test, "torch", "float64")
+test_lattice_collection_tensorflow = setup_test_for_backend(
+    _lattice_collection_test, "tensorflow", "float64"
+)
+test_lattice_collection_jax = setup_test_for_backend(_lattice_collection_test, "jax", "float64")
 
 
 def _lattice_accuracy_test(backend, dtype_name=None):
@@ -80,7 +126,7 @@ def _lattice_accuracy_test(backend, dtype_name=None):
             dim=_DIM,
             N=_N,
             integration_domain=_DOMAIN,
-            rng=Lattice(backend="torch", seed=0),
+            rng=Lattice(backend=backend, seed=0),
         )
     )
     assert abs(result - _EXPECTED) < 1e-3, (
@@ -102,7 +148,7 @@ def _lattice_beats_mc_test(backend, dtype_name=None):
                 dim=_DIM,
                 N=_N,
                 integration_domain=_DOMAIN,
-                rng=Lattice(backend="torch", seed=0),
+                rng=Lattice(backend=backend, seed=0),
             )
         )
         - _EXPECTED
@@ -128,18 +174,37 @@ def _lattice_determinism_test(backend, dtype_name=None):
                 dim=_DIM,
                 N=_N,
                 integration_domain=_DOMAIN,
-                rng=Lattice(backend="torch", seed=42),
+                rng=Lattice(backend=backend, seed=42),
             )
         )
 
     assert run() == run(), "Lattice integration is not reproducible for a fixed seed"
 
 
+test_lattice_accuracy_numpy = setup_test_for_backend(_lattice_accuracy_test, "numpy", "float64")
 test_lattice_accuracy_torch = setup_test_for_backend(_lattice_accuracy_test, "torch", "float64")
+test_lattice_accuracy_tensorflow = setup_test_for_backend(
+    _lattice_accuracy_test, "tensorflow", "float64"
+)
+test_lattice_accuracy_jax = setup_test_for_backend(_lattice_accuracy_test, "jax", "float64")
+
+test_lattice_beats_mc_numpy = setup_test_for_backend(_lattice_beats_mc_test, "numpy", "float64")
 test_lattice_beats_mc_torch = setup_test_for_backend(_lattice_beats_mc_test, "torch", "float64")
+test_lattice_beats_mc_tensorflow = setup_test_for_backend(
+    _lattice_beats_mc_test, "tensorflow", "float64"
+)
+test_lattice_beats_mc_jax = setup_test_for_backend(_lattice_beats_mc_test, "jax", "float64")
+
+test_lattice_determinism_numpy = setup_test_for_backend(
+    _lattice_determinism_test, "numpy", "float64"
+)
 test_lattice_determinism_torch = setup_test_for_backend(
     _lattice_determinism_test, "torch", "float64"
 )
+test_lattice_determinism_tensorflow = setup_test_for_backend(
+    _lattice_determinism_test, "tensorflow", "float64"
+)
+test_lattice_determinism_jax = setup_test_for_backend(_lattice_determinism_test, "jax", "float64")
 
 
 def test_lattice_preserves_gradient():
@@ -166,15 +231,21 @@ def test_lattice_preserves_gradient():
 
 
 # ---------------------------------------------------------------------------
-# Lattice-specific tests: backend validation, the closed-form construction,
-# the one-shot shift, and input validation on N and dim. None of these have a
-# Sobol equivalent.
+# Backend validation
 # ---------------------------------------------------------------------------
 
 
-def test_lattice_rejects_non_torch_backend():
-    with pytest.raises(ValueError, match="torch"):
-        Lattice(backend="numpy")
+def test_lattice_rejects_invalid_backend():
+    with pytest.raises(ValueError, match="backend"):
+        Lattice(backend="bogus")
+
+
+# ---------------------------------------------------------------------------
+# Lattice-specific tests: the closed-form construction, the one-shot shift,
+# the optional Baker's transform, and input validation on N and dim.
+# Torch-only -- the per-backend tests above already cover cross-backend
+# correctness.
+# ---------------------------------------------------------------------------
 
 
 def test_lattice_matches_closed_form_without_shift():
@@ -316,11 +387,94 @@ def test_lattice_rejects_out_of_range_dimensions():
             Lattice(backend="torch").uniform([1024, bad_dim], torch.float64)
 
 
+def test_lattice_tent_points_lie_in_unit_cube():
+    """With tent=True, points must still lie in [0, 1) (the tent map maps
+    [0, 1) to [0, 1))."""
+    set_up_backend("torch", "float64")
+    n, dim = 1024, 3
+
+    points = Lattice(backend="torch", seed=0, tent=True).uniform([n, dim], torch.float64)
+    assert torch.all(points >= 0) and torch.all(points < 1), (
+        "Tent-transformed Lattice points fall outside [0, 1)"
+    )
+
+
+def test_lattice_tent_changes_points():
+    """With tent=True, the returned points must differ from the
+    (shifted-but-not-tent-transformed) lattice -- otherwise the transform
+    would be silently having no effect."""
+    set_up_backend("torch", "float64")
+    n, dim = 1024, 3
+
+    plain = Lattice(backend="torch", seed=0, tent=False).uniform([n, dim], torch.float64)
+    tented = Lattice(backend="torch", seed=0, tent=True).uniform([n, dim], torch.float64)
+
+    assert not torch.equal(plain, tented), (
+        "Tent-transformed points must not be identical to the plain lattice"
+    )
+
+
+def test_lattice_tent_improves_nonperiodic_convergence():
+    """Baker's transform periodizes the integrand, which should improve
+    convergence for a smooth but non-periodic integrand, averaged over
+    several independent shifts to avoid relying on a single seed's draw.
+
+    Measured with the real generating vector, averaged over 15 seeds:
+    tent=True was ~502x more accurate than tent=False on prod_i(x_i) at
+    N=4096, dim=3. This threshold (20x) is set well below that measurement
+    to leave a comfortable margin -- a single seed's ratio was found to vary
+    quite a bit (as low as ~28x for seed=0 alone), so the margin needs to
+    absorb real run-to-run variance, not just be a token safety factor.
+    """
+    n, dim, trials = 4096, 3, 15
+    mc = MonteCarlo()
+    exact = 0.5**dim
+
+    errors_plain, errors_tent = [], []
+    for seed in range(trials):
+        error_plain = abs(
+            _to_float(
+                mc.integrate(
+                    _nonperiodic_integrand,
+                    dim=dim,
+                    N=n,
+                    integration_domain=[[0.0, 1.0]] * dim,
+                    rng=Lattice(backend="torch", seed=seed, tent=False),
+                )
+            )
+            - exact
+        )
+        error_tent = abs(
+            _to_float(
+                mc.integrate(
+                    _nonperiodic_integrand,
+                    dim=dim,
+                    N=n,
+                    integration_domain=[[0.0, 1.0]] * dim,
+                    rng=Lattice(backend="torch", seed=seed, tent=True),
+                )
+            )
+            - exact
+        )
+        errors_plain.append(error_plain)
+        errors_tent.append(error_tent)
+
+    mean_plain = float(np.mean(errors_plain))
+    mean_tent = float(np.mean(errors_tent))
+    assert mean_tent > 0, "degenerate test: tent-transformed error measured as exactly zero"
+    assert mean_plain / mean_tent > 20, (
+        f"tent=True only {mean_plain / mean_tent:.1f}x better than tent=False "
+        f"on average over {trials} seeds, expected >> 20x (Baker's transform)"
+    )
+
+
 if __name__ == "__main__":
-    for _test in (_lattice_accuracy_test, _lattice_beats_mc_test, _lattice_determinism_test):
-        _test("torch")
-    test_lattice_rejects_non_torch_backend()
+    for _backend in ["numpy", "torch", "tensorflow", "jax"]:
+        _lattice_accuracy_test(_backend)
+        _lattice_beats_mc_test(_backend)
+        _lattice_determinism_test(_backend)
     test_lattice_preserves_gradient()
+    test_lattice_rejects_invalid_backend()
     test_lattice_matches_closed_form_without_shift()
     test_lattice_same_seed_reproduces_shift_across_calls()
     test_lattice_unseeded_shift_differs_across_calls()
@@ -330,4 +484,6 @@ if __name__ == "__main__":
     test_lattice_points_lie_in_unit_cube()
     test_lattice_rejects_non_power_of_two_point_count()
     test_lattice_rejects_out_of_range_dimensions()
+    test_lattice_tent_points_lie_in_unit_cube()
+    test_lattice_tent_changes_points()
     print("All Lattice tests passed!")
