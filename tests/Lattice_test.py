@@ -85,11 +85,7 @@ def _lattice_collection_test(backend, dtype_name=None):
     collection accurately, at each dimension it covers.
 
     Bounds were derived empirically across all four backends (numpy, torch,
-    tensorflow, jax) with seed=0. The dim=1 bound is noticeably looser than
-    the equivalent RandomizedLatinHypercube bound: the worst offender is a
-    non-periodic quartic polynomial with odd-order terms, and an unshifted
-    rank-1 lattice (tent=False, the default here) only recovers its best
-    convergence rate on periodic integrands (see the Lattice docstring).
+    tensorflow, jax) with seed=0.
     """
     mc = MonteCarlo()
     cases = [(1, 2**12, 0.5), (3, 2**12, 0.07), (10, 2**11, 6e-4)]
