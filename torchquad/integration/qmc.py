@@ -113,8 +113,8 @@ class RandomizedLatinHypercube:
     internally.
 
     For a given dimension, points are constructed as
-    ``x_i = (perm(i) - U_i) / n``, where ``perm`` is an independent random
-    permutation of ``1, ..., n`` and ``U_i`` are i.i.d. ``Uniform(0, 1)``,
+    ``x_i = (perm(i) + U_i) / n``, where ``perm`` is an independent random
+    permutation of ``0, ..., n-1`` and ``U_i`` are i.i.d. ``Uniform(0, 1)``,
     independently for every dimension. Points are generated directly on the
     requested backend/device in pure PyTorch for the ``torch`` backend, and
     with ``scipy.stats.qmc.LatinHypercube`` for the others (converted to the
@@ -123,6 +123,9 @@ class RandomizedLatinHypercube:
     integration domain; only the point *placement* differs.
 
     Notes:
+        - Points are guaranteed to lie in ``[0, 1)``: since ``U_i < 1``
+          always, ``(perm(i) + U_i) / n`` is always strictly below
+          ``(n - 1 + 1) / n = 1``, regardless of the draw.
         - Unlike the low-discrepancy sequences in this module (Sobol, Halton),
           there is no notion of extensibility or balance properties tied to a
           particular sample size: any strictly positive ``n`` is valid.
@@ -196,9 +199,9 @@ class RandomizedLatinHypercube:
                 generator.seed()
 
             keys = torch.rand((dim, n), generator=generator, device=device, dtype=dtype)
-            permutations = torch.argsort(keys, dim=-1) + 1
+            permutations = torch.argsort(keys, dim=-1)
             U = torch.rand((dim, n), generator=generator, device=device, dtype=dtype)
-            result = (permutations.to(dtype) - U) / n
+            result = (permutations.to(dtype) + U) / n
             return result.transpose(0, 1)  # -> (n, dim)
 
         # numpy / jax / tensorflow: generate with SciPy (a hard dependency) and
