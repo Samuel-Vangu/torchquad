@@ -23,7 +23,13 @@ to a real bug found and fixed during development of the torch backend:
       float64 machine epsilon, which is a strong end-to-end check that the
       pure-PyTorch digit extraction and reconstruction is mathematically
       correct, independent of the (separately implemented, deliberately
-      different) scrambling logic.
+      different) scrambling logic;
+    - a continuous distribution for small N (down to N=1): when few digits
+      are needed to distinguish the requested points, digit scrambling alone
+      can only produce a handful of discrete outcomes (e.g. exactly {0.0,
+      0.5} for N=1 in the first dimension), which biases the resulting
+      Monte Carlo estimator for general integrands. A continuous tail shift
+      is added after digit scrambling to fix this.
 
 Coverage runs on every backend.
 """
@@ -309,6 +315,34 @@ def test_halton_matches_scipy_when_unscrambled():
         )
 
 
+def test_halton_n1_scrambled_distribution_is_continuous():
+    """Regression test for a real bias found in review: with N=1 and base=2
+    (the first dimension), only m=1 digit is needed to distinguish the
+    single requested point, so digit scrambling alone can only produce two
+    possible outcomes (0.0 or 0.5) across seeds -- not a genuine draw from
+    [0, 1), which biases the resulting Monte Carlo estimator for general
+    integrands.
+
+    A continuous tail shift, added after digit scrambling, fixes this by
+    filling in the sub-digit resolution that a coarse digit count leaves
+    out. Verified here directly: across 200 seeds, N=1 draws must span far
+    more than the 2 values the historical bug was limited to, and must not
+    be confined to {0.0, 0.5}.
+    """
+    values = [
+        Halton(backend="torch", seed=seed, scramble=True).uniform([1, 1], torch.float64).item()
+        for seed in range(200)
+    ]
+    distinct = set(round(v, 6) for v in values)
+    assert len(distinct) > 50, (
+        f"Only {len(distinct)} distinct values across 200 seeds for N=1 -- "
+        "expected a genuinely continuous distribution, not a small discrete set"
+    )
+    assert not all(v in (0.0, 0.5) for v in values), (
+        "N=1 scrambled draws are still confined to {0.0, 0.5}, the exact bias flagged in review"
+    )
+
+
 if __name__ == "__main__":
     from torchquad.utils.set_up_backend import set_up_backend
 
@@ -321,4 +355,5 @@ if __name__ == "__main__":
     test_halton_no_power_of_two_warning()
     test_halton_stratification_property()
     test_halton_matches_scipy_when_unscrambled()
+    test_halton_n1_scrambled_distribution_is_continuous()
     print("All Halton tests passed!")

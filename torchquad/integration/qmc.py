@@ -185,6 +185,10 @@ class Halton:
           at depth r depends on the already-scrambled digits 0..r-1. This
           preserves low discrepancy exactly like Owen scrambling, but is a
           simplified subset of it for bases > 2 (see `_hash_mix` docstring).
+          A further continuous shift, uniform within the resolution of the
+          last digit, is added after digit scrambling (see `uniform`), so
+          the estimator remains unbiased even when few digits are needed
+          (e.g. N=1).
         - The number of digits m is computed PER DIMENSION, not shared across
           dimensions: dimensions with larger bases need fewer digits for the
           same number of points, and sharing a single m (driven by the
@@ -304,6 +308,16 @@ class Halton:
                 for r in range(m_j):
                     acc = acc * base + digits[:, r]
                 col = acc.to(torch.float64) / (base**m_j)
+
+                if self._scramble:
+                    tail_generator = torch.Generator(device=device)
+                    tail_seed = (seed * 1000003 + j * 97 + m_j) & 0x7FFFFFFF
+                    tail_generator.manual_seed(tail_seed)
+                    tail = torch.rand(
+                        1, generator=tail_generator, device=device, dtype=torch.float64
+                    )
+                    col = col + tail / (base**m_j)
+
                 columns.append(col)
 
             points = torch.stack(columns, dim=1).to(dtype)
