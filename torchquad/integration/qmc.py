@@ -215,6 +215,22 @@ class Lattice:
     points are evaluated and is not always beneficial (e.g. for an integrand
     that is already periodic on the domain).
 
+    **Range with** ``tent=True``: the tent map's peak value is exactly 1,
+    reached whenever a point lands exactly on 0.5. With ``shift=False``, this
+    happens systematically (not by rare chance): the bundled generating
+    vector's first component is 1, so for any valid (power-of-two) number of
+    points ``N``, index ``i = N/2`` lands exactly on 0.5 in the first
+    dimension. With ``shift=True`` this would additionally require the
+    continuous random shift to land a point exactly on 0.5, which has
+    probability zero but is not structurally excluded. Tented points
+    therefore lie in the **closed** interval ``[0, 1]``, unlike every other
+    configuration of this sampler (``tent=False``, with or without
+    ``shift``), which is provably confined to the half-open ``[0, 1)``: the
+    unshifted construction is bounded above by ``(N-1)/N < 1`` by integer
+    arithmetic, and the shifted construction's final ``% 1.0`` maps into
+    ``[0, 1)`` by definition of the modulo operation, regardless of its
+    input.
+
     As with plain Monte Carlo, the sample points are constants, so gradients
     still flow through the integrand and the integration domain; only the point
     placement differs.
@@ -256,8 +272,12 @@ class Lattice:
             tent (bool, optional): Whether to apply a Baker's transform (tent
                 map) to the points after the shift, which periodizes a
                 non-periodic integrand and can substantially improve
-                convergence for smooth non-periodic integrands. Defaults to
-                False.
+                convergence for smooth non-periodic integrands. Unlike every
+                other configuration of this sampler, points returned with
+                ``tent=True`` lie in the closed interval [0, 1] rather than
+                [0, 1): the tent map's peak is exactly 1, reached whenever a
+                point lands exactly on 0.5 .
+                Defaults to False.
 
         Raises:
             ValueError: If backend is not one of "torch", "numpy", "jax", or
@@ -273,7 +293,8 @@ class Lattice:
         self._tent = tent
 
     def uniform(self, size, dtype):
-        """Draw rank-1 lattice points in ``[0, 1)``.
+        """Draw rank-1 lattice points in ``[0, 1)`` (or ``[0, 1]`` if
+        ``tent=True``).
 
         Args:
             size (list): Two-element ``[number_of_points, dim]`` shape.
@@ -281,7 +302,8 @@ class Lattice:
 
         Returns:
             backend tensor: ``[number_of_points, dim]`` lattice points in
-            ``[0, 1)``.
+            ``[0, 1)``, or in the closed interval ``[0, 1]`` if
+            ``tent=True``.
 
         Raises:
             ValueError: If the number of points is not between
@@ -318,6 +340,10 @@ class Lattice:
         if self._tent:
             # Baker's transform: periodizes the integrand so the lattice rule
             # recovers its convergence rate on non-periodic integrands.
+            # The peak of this map is exactly 1 (reached when a point lands
+            # exactly on 0.5), so the output range becomes the closed [0, 1]
+            # here, unlike the [0, 1) guaranteed everywhere else in this
+            # method
             points = 1.0 - anp.abs(2.0 * points - 1.0)
 
         return points

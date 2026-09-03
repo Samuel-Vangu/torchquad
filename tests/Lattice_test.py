@@ -340,7 +340,9 @@ def test_lattice_seed_ignored_when_shift_false():
 
 
 def test_lattice_points_lie_in_unit_cube():
-    """Every coordinate must lie in [0, 1), both with and without a shift."""
+    """Every coordinate must lie in [0, 1), both with and without a shift
+    (tent=False in both cases; see test_lattice_tent_points_lie_in_closed_unit_cube
+    for the tent=True case, whose range is the closed [0, 1])."""
     set_up_backend("torch", "float64")
     n, dim = 2048, 5
 
@@ -383,15 +385,36 @@ def test_lattice_rejects_out_of_range_dimensions():
             Lattice(backend="torch").uniform([1024, bad_dim], torch.float64)
 
 
-def test_lattice_tent_points_lie_in_unit_cube():
-    """With tent=True, points must still lie in [0, 1) (the tent map maps
-    [0, 1) to [0, 1))."""
+def test_lattice_tent_points_lie_in_closed_unit_cube():
+    """With tent=True, points must lie in the CLOSED [0, 1], not the
+    half-open [0, 1) used everywhere else in this sampler: the tent map's
+    peak is exactly 1, reached whenever a point lands exactly on 0.5 (see
+    test_lattice_tent_reaches_exact_upper_bound_at_midpoint for the
+    structural case where this is guaranteed, not just possible)."""
     set_up_backend("torch", "float64")
     n, dim = 1024, 3
 
     points = Lattice(backend="torch", seed=0, tent=True).uniform([n, dim], torch.float64)
-    assert torch.all(points >= 0) and torch.all(points < 1), (
-        "Tent-transformed Lattice points fall outside [0, 1)"
+    assert torch.all(points >= 0) and torch.all(points <= 1), (
+        "Tent-transformed Lattice points fall outside the closed interval [0, 1]"
+    )
+
+
+def test_lattice_tent_reaches_exact_upper_bound_at_midpoint():
+    """The tent map's peak is exactly 1, reached whenever a lattice point
+    lands exactly on 0.5 -- which happens systematically (not by rare
+    chance) at index N/2 whenever the generating vector's first component
+    is 1, since N is always a power of 2. Regression test for the exact
+    boundary case flagged in review: N=1024, i=512, dim=1, shift=False.
+    """
+    set_up_backend("torch", "float64")
+    n = 1024
+    points = Lattice(backend="torch", shift=False, tent=True).uniform([n, 1], torch.float64)
+    assert points[512, 0].item() == 1.0, (
+        "Expected the tent-transformed midpoint (i=N/2) to be exactly 1.0"
+    )
+    assert torch.all(points >= 0) and torch.all(points <= 1), (
+        "Tented points must lie in the closed interval [0, 1]"
     )
 
 
@@ -480,6 +503,7 @@ if __name__ == "__main__":
     test_lattice_points_lie_in_unit_cube()
     test_lattice_rejects_non_power_of_two_point_count()
     test_lattice_rejects_out_of_range_dimensions()
-    test_lattice_tent_points_lie_in_unit_cube()
+    test_lattice_tent_points_lie_in_closed_unit_cube()
+    test_lattice_tent_reaches_exact_upper_bound_at_midpoint()
     test_lattice_tent_changes_points()
     print("All Lattice tests passed!")
